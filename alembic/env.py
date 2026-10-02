@@ -2,7 +2,6 @@ import asyncio
 import os
 from logging.config import fileConfig
 
-from infrastructure.database.base import Base
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import AsyncEngine, async_engine_from_config
 
@@ -10,7 +9,8 @@ from alembic import context
 
 # Import every feature's models module here so Base.metadata is fully
 # populated before autogenerate runs.
-# (added to by later tasks as features gain models)
+from app.auth import models as auth_models  # noqa: F401
+from infrastructure.database.base import Base
 
 config = context.config
 if config.config_file_name is not None:
