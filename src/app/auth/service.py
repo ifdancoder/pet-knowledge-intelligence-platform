@@ -6,10 +6,17 @@ from app.auth.repository import (
     RefreshTokenRepository,
     UserRepository,
 )
-from app.auth.security import generate_opaque_token, hash_opaque_token, hash_password
+from app.auth.security import (
+    create_access_token,
+    generate_opaque_token,
+    hash_opaque_token,
+    hash_password,
+    verify_password,
+)
 from app.shared.exceptions import AppError
 
 VERIFICATION_TOKEN_TTL = datetime.timedelta(hours=24)
+REFRESH_TOKEN_TTL = datetime.timedelta(days=30)
 
 
 class EmailAlreadyRegisteredError(AppError):
@@ -20,6 +27,16 @@ class EmailAlreadyRegisteredError(AppError):
 class InvalidOrExpiredTokenError(AppError):
     code = "invalid_or_expired_token"
     status_code = 400
+
+
+class InvalidCredentialsError(AppError):
+    code = "invalid_credentials"
+    status_code = 401
+
+
+class AccountNotActiveError(AppError):
+    code = "account_not_active"
+    status_code = 403
 
 
 class AuthService:
@@ -60,3 +77,18 @@ class AuthService:
         assert user is not None
         await self._users.activate(user)
         await self._verification_tokens.mark_used(record)
+
+    async def login(self, *, email: str, password: str) -> tuple[str, str]:
+        user = await self._users.get_by_email(email)
+        if user is None or not verify_password(password, user.hashed_password):
+            raise InvalidCredentialsError("invalid email or password")
+        if not user.is_active:
+            raise AccountNotActiveError("account is not verified")
+
+        access_token = create_access_token(user_id=user.id)
+        raw_refresh_token = generate_opaque_token()
+        expires_at = datetime.datetime.now(datetime.UTC) + REFRESH_TOKEN_TTL
+        await self._refresh_tokens.create(
+            user_id=user.id, token_hash=hash_opaque_token(raw_refresh_token), expires_at=expires_at
+        )
+        return access_token, raw_refresh_token

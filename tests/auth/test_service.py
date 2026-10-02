@@ -3,7 +3,13 @@ import datetime
 from app.auth.email_sender import EmailSender
 from app.auth.models import EmailVerificationToken, RefreshToken, User
 from app.auth.security import generate_opaque_token, hash_opaque_token
-from app.auth.service import AuthService, EmailAlreadyRegisteredError, InvalidOrExpiredTokenError
+from app.auth.service import (
+    AccountNotActiveError,
+    AuthService,
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+    InvalidOrExpiredTokenError,
+)
 
 
 class FakeUserRepository:
@@ -153,3 +159,44 @@ async def test_verify_email_rejects_reused_token() -> None:
         raise AssertionError("expected InvalidOrExpiredTokenError")
     except InvalidOrExpiredTokenError:
         pass
+
+
+async def test_login_rejects_unverified_account() -> None:
+    service, _, _, _ = make_service()
+    await service.register(email="a@example.com", password="longenoughpassword")
+    try:
+        await service.login(email="a@example.com", password="longenoughpassword")
+        raise AssertionError("expected AccountNotActiveError")
+    except AccountNotActiveError:
+        pass
+
+
+async def test_login_rejects_wrong_password() -> None:
+    service, _, _, email_sender = make_service()
+    await service.register(email="a@example.com", password="longenoughpassword")
+    await service.verify_email(token=email_sender.sent[0][1])
+    try:
+        await service.login(email="a@example.com", password="wrongpassword")
+        raise AssertionError("expected InvalidCredentialsError")
+    except InvalidCredentialsError:
+        pass
+
+
+async def test_login_rejects_unknown_email() -> None:
+    service, _, _, _ = make_service()
+    try:
+        await service.login(email="missing@example.com", password="whatever")
+        raise AssertionError("expected InvalidCredentialsError")
+    except InvalidCredentialsError:
+        pass
+
+
+async def test_login_returns_access_and_refresh_token_for_verified_user() -> None:
+    service, _, _, email_sender = make_service()
+    await service.register(email="a@example.com", password="longenoughpassword")
+    await service.verify_email(token=email_sender.sent[0][1])
+
+    access_token, refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+
+    assert isinstance(access_token, str) and access_token
+    assert isinstance(refresh_token, str) and refresh_token
