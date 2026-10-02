@@ -1,12 +1,23 @@
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.auth.api import router as auth_router
+from app.shared.db import build_session_factory, session_holder
 from app.shared.exceptions import register_exception_handlers
 from app.workspaces.api import router as workspaces_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    session_holder.factory = build_session_factory(os.environ["DATABASE_URL"])
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="Knowledge Intelligence Platform")
+    app = FastAPI(title="Knowledge Intelligence Platform", lifespan=lifespan)
     register_exception_handlers(app)
     app.include_router(auth_router)
     app.include_router(workspaces_router)
