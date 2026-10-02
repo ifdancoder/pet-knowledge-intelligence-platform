@@ -14,7 +14,9 @@ class Workspace(Base, ULIDPrimaryKeyMixin, TimestampMixin):
 class WorkspaceMember(Base, TimestampMixin):
     __tablename__ = "workspace_members"
 
-    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     role: Mapped[str] = mapped_column(String(20))
     invited_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), default=None)
