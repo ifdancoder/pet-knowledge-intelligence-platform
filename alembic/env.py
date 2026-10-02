@@ -10,6 +10,7 @@ from alembic import context
 # Import every feature's models module here so Base.metadata is fully
 # populated before autogenerate runs.
 from app.auth import models as auth_models  # noqa: F401
+from app.workspaces import models as workspace_models  # noqa: F401
 from infrastructure.database.base import Base
 
 config = context.config
