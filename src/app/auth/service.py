@@ -39,6 +39,11 @@ class AccountNotActiveError(AppError):
     status_code = 403
 
 
+class RefreshTokenReuseError(AppError):
+    code = "refresh_token_reuse_detected"
+    status_code = 401
+
+
 class AuthService:
     def __init__(
         self,
@@ -92,3 +97,33 @@ class AuthService:
             user_id=user.id, token_hash=hash_opaque_token(raw_refresh_token), expires_at=expires_at
         )
         return access_token, raw_refresh_token
+
+    async def refresh(self, *, refresh_token: str) -> tuple[str, str]:
+        token_hash = hash_opaque_token(refresh_token)
+        record = await self._refresh_tokens.get_by_hash(token_hash)
+        if record is None:
+            raise InvalidOrExpiredTokenError("refresh token is invalid")
+        if record.revoked_at is not None:
+            await self._refresh_tokens.revoke_all_for_user(record.user_id)
+            raise RefreshTokenReuseError("refresh token reuse detected")
+        if record.expires_at < datetime.datetime.now(datetime.UTC):
+            raise InvalidOrExpiredTokenError("refresh token has expired")
+
+        access_token = create_access_token(user_id=record.user_id)
+        raw_new_refresh_token = generate_opaque_token()
+        expires_at = datetime.datetime.now(datetime.UTC) + REFRESH_TOKEN_TTL
+        new_record = await self._refresh_tokens.create(
+            user_id=record.user_id,
+            token_hash=hash_opaque_token(raw_new_refresh_token),
+            expires_at=expires_at,
+        )
+        await self._refresh_tokens.revoke(record, replaced_by_id=new_record.id)
+        return access_token, raw_new_refresh_token
+
+    async def logout(self, *, refresh_token: str) -> None:
+        record = await self._refresh_tokens.get_by_hash(hash_opaque_token(refresh_token))
+        if record is not None and record.revoked_at is None:
+            await self._refresh_tokens.revoke(record)
+
+    async def logout_all(self, *, user_id: str) -> None:
+        await self._refresh_tokens.revoke_all_for_user(user_id)

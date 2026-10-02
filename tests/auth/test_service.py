@@ -9,6 +9,7 @@ from app.auth.service import (
     EmailAlreadyRegisteredError,
     InvalidCredentialsError,
     InvalidOrExpiredTokenError,
+    RefreshTokenReuseError,
 )
 
 
@@ -200,3 +201,73 @@ async def test_login_returns_access_and_refresh_token_for_verified_user() -> Non
 
     assert isinstance(access_token, str) and access_token
     assert isinstance(refresh_token, str) and refresh_token
+
+
+async def _registered_and_verified(
+    service: AuthService, email_sender: FakeEmailSender, email: str = "a@example.com"
+) -> None:
+    await service.register(email=email, password="longenoughpassword")
+    await service.verify_email(token=email_sender.sent[-1][1])
+
+
+async def test_refresh_rotates_token() -> None:
+    service, _, _, email_sender = make_service()
+    await _registered_and_verified(service, email_sender)
+    _, refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+
+    new_access_token, new_refresh_token = await service.refresh(refresh_token=refresh_token)
+
+    assert new_refresh_token != refresh_token
+    assert isinstance(new_access_token, str) and new_access_token
+
+
+async def test_refresh_rejects_reused_token_and_revokes_chain() -> None:
+    service, _, _, email_sender = make_service()
+    await _registered_and_verified(service, email_sender)
+    _, old_refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+
+    _, new_refresh_token = await service.refresh(refresh_token=old_refresh_token)
+
+    try:
+        await service.refresh(refresh_token=old_refresh_token)
+        raise AssertionError("expected RefreshTokenReuseError")
+    except RefreshTokenReuseError:
+        pass
+
+    try:
+        await service.refresh(refresh_token=new_refresh_token)
+        raise AssertionError("expected RefreshTokenReuseError")
+    except RefreshTokenReuseError:
+        pass
+
+
+async def test_logout_revokes_only_that_token() -> None:
+    service, _, _, email_sender = make_service()
+    await _registered_and_verified(service, email_sender)
+    _, refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+
+    await service.logout(refresh_token=refresh_token)
+
+    try:
+        await service.refresh(refresh_token=refresh_token)
+        raise AssertionError("expected RefreshTokenReuseError")
+    except RefreshTokenReuseError:
+        pass
+
+
+async def test_logout_all_revokes_every_token_for_user() -> None:
+    service, users, _, email_sender = make_service()
+    await _registered_and_verified(service, email_sender)
+    user = await users.get_by_email("a@example.com")
+    assert user is not None
+    _, first_refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+    _, second_refresh_token = await service.login(email="a@example.com", password="longenoughpassword")
+
+    await service.logout_all(user_id=user.id)
+
+    for token in (first_refresh_token, second_refresh_token):
+        try:
+            await service.refresh(refresh_token=token)
+            raise AssertionError("expected RefreshTokenReuseError")
+        except RefreshTokenReuseError:
+            pass
