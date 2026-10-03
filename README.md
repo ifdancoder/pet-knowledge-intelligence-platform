@@ -14,16 +14,17 @@ Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async, asyncpg), Alembic, Pos
 - **EmailSender as a Strategy.** Email verification goes through an `EmailSender` Protocol; the only implementation today is `ConsoleEmailSender` (logs instead of sending), so a real SMTP/SES sender can be added later without touching the service layer.
 - **ULIDs for all entity IDs**, assigned by domain factory methods at creation time (not generated as a database default), sortable by creation time.
 - **Cascade deletes for workspace membership.** Deleting a workspace cascades to its `workspace_members` rows at the database level, rather than requiring the application to clean them up first.
-- **Sync workers, async API.** Celery tasks run synchronously end to end (their own sync SQLAlchemy engine) — the one exception is `SourceLoader.load()`, bridged with a single `asyncio.run()` call inside `ExtractDocumentService`, not spread through the worker. The API stays fully async, with its own async `SourceRepository` adapter for the two operations it needs.
+- **Sync workers, async API.** Celery tasks run synchronously end to end (their own sync SQLAlchemy engine) — the one exception is `SourceLoader.load()`, bridged with a single `asyncio.run()` call inside `ExtractDocumentCommandHandler`, not spread through the worker. The API stays fully async, with its own async `SourceRepository` adapter for the two operations it needs.
 - **Idempotent, lockable pipeline stages.** Each stage checks `Source.status` before acting (safe against retries and duplicate delivery), runs inside a Redis lock keyed by `source_id`, and routes to a RabbitMQ dead-letter queue once retries are exhausted.
 - **SourceLoader and EmbeddingProvider as Strategies.** `PdfSourceLoader`/`MarkdownSourceLoader` and `LocalEmbeddingProvider`/`OpenAIEmbeddingProvider` are both Protocol-based variation points, selected by a registry or an environment flag rather than branching inside the pipeline.
+- **CQRS at the application layer.** Every use case is an explicit `Command`/`Query` dataclass plus a single-method handler, not a multi-method service class. Commands return `None`, except for two narrow, explicit exceptions: creation commands return only the new entity's id (needed to build the response or a follow-up query), and `LoginCommand`/`RefreshCommand` return their issued tokens (an ephemeral secret — only the hash is ever persisted, so there is no query that could recover it afterward). No Command/Query Bus: handlers are constructed and invoked the same way the services they replaced were, via `Depends()`.
 
 ## Project structure
 
 Hexagonal/Clean Architecture, organized by layer with feature sub-packages nested inside each:
 
 - `src/domain/` — plain-Python entities and aggregates (`User`, `Workspace`, `Source`, `Chunk`), domain exceptions, and ports (`Protocol` interfaces). No framework or ORM imports.
-- `src/application/` — use-case services (`AuthService`, `WorkspaceService`, the five ingestion pipeline-stage services) orchestrating domain entities through ports.
+- `src/application/` — use cases as `Command`/`Query` dataclasses plus single-method `Handler` classes, orchestrating domain entities through ports.
 - `src/infrastructure/` — adapters: SQLAlchemy ORM models and repositories, password/JWT utilities, the console email sender, source loaders, embedding providers, S3/MinIO storage, the Elasticsearch indexer, the Redis lock.
 - `src/presentation/api/` — FastAPI routers, Pydantic request/response schemas, dependency wiring, and the domain-error-to-HTTP mapping.
 - `src/presentation/tasks/` — Celery task functions, the pipeline's other driving adapter (alongside `presentation/api/`).
