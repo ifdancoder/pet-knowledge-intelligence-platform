@@ -5,12 +5,19 @@ import redis
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from application.ingestion.services import (
-    ExtractDocumentService,
-    GenerateEmbeddingsService,
-    IndexChunksService,
-    NormalizeDocumentService,
-    SplitIntoChunksService,
+from application.ingestion.command_handlers import (
+    ExtractDocumentCommandHandler,
+    GenerateEmbeddingsCommandHandler,
+    IndexChunksCommandHandler,
+    NormalizeDocumentCommandHandler,
+    SplitIntoChunksCommandHandler,
+)
+from application.ingestion.commands import (
+    ExtractDocumentCommand,
+    GenerateEmbeddingsCommand,
+    IndexChunksCommand,
+    NormalizeDocumentCommand,
+    SplitIntoChunksCommand,
 )
 from infrastructure.ingestion.embeddings.local_provider import LocalEmbeddingProvider
 from infrastructure.ingestion.embeddings.openai_provider import OpenAIEmbeddingProvider
@@ -59,13 +66,13 @@ def extract_document(self: Any, source_id: str) -> None:
     with source_lock(_redis_client, source_id):
         session = _SessionLocal()
         try:
-            service = ExtractDocumentService(
+            handler = ExtractDocumentCommandHandler(
                 SqlAlchemySourceRepository(session),
                 SqlAlchemyDocumentRepository(session),
                 _storage,
                 _loader_registry,
             )
-            service.run(source_id)
+            handler.handle(ExtractDocumentCommand(source_id))
             session.commit()
         finally:
             session.close()
@@ -77,10 +84,10 @@ def normalize_document(self: Any, source_id: str) -> None:
     with source_lock(_redis_client, source_id):
         session = _SessionLocal()
         try:
-            service = NormalizeDocumentService(
+            handler = NormalizeDocumentCommandHandler(
                 SqlAlchemySourceRepository(session), SqlAlchemyDocumentRepository(session)
             )
-            service.run(source_id)
+            handler.handle(NormalizeDocumentCommand(source_id))
             session.commit()
         finally:
             session.close()
@@ -92,12 +99,12 @@ def split_into_chunks_task(self: Any, source_id: str) -> None:
     with source_lock(_redis_client, source_id):
         session = _SessionLocal()
         try:
-            service = SplitIntoChunksService(
+            handler = SplitIntoChunksCommandHandler(
                 SqlAlchemySourceRepository(session),
                 SqlAlchemyDocumentRepository(session),
                 SqlAlchemyChunkRepository(session),
             )
-            service.run(source_id)
+            handler.handle(SplitIntoChunksCommand(source_id))
             session.commit()
         finally:
             session.close()
@@ -109,10 +116,10 @@ def generate_embeddings(self: Any, source_id: str) -> None:
     with source_lock(_redis_client, source_id):
         session = _SessionLocal()
         try:
-            service = GenerateEmbeddingsService(
+            handler = GenerateEmbeddingsCommandHandler(
                 SqlAlchemySourceRepository(session), SqlAlchemyChunkRepository(session), _embedding_provider
             )
-            service.run(source_id)
+            handler.handle(GenerateEmbeddingsCommand(source_id))
             session.commit()
         finally:
             session.close()
@@ -124,10 +131,10 @@ def index_chunks(self: Any, source_id: str) -> None:
     with source_lock(_redis_client, source_id):
         session = _SessionLocal()
         try:
-            service = IndexChunksService(
+            handler = IndexChunksCommandHandler(
                 SqlAlchemySourceRepository(session), SqlAlchemyChunkRepository(session), _search_indexer
             )
-            service.run(source_id)
+            handler.handle(IndexChunksCommand(source_id))
             session.commit()
         finally:
             session.close()
