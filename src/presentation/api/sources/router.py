@@ -1,0 +1,63 @@
+import os
+
+from fastapi import APIRouter, Depends, File, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from application.ingestion.upload_service import SourceUploadService
+from domain.ingestion.exceptions import SourceNotFoundError
+from domain.workspaces.entities import Permission, Role
+from infrastructure.database.session import get_db
+from infrastructure.ingestion.async_repository import SqlAlchemyAsyncSourceRepository
+from infrastructure.ingestion.storage import S3Storage
+from presentation.api.sources.schemas import SourceResponse
+from presentation.api.workspaces.dependencies import require_permission
+from presentation.tasks.ingestion import extract_document
+
+router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/sources", tags=["sources"])
+
+_storage = S3Storage(
+    endpoint_url=os.environ.get("S3_ENDPOINT_URL", "http://localhost:9000"),
+    access_key=os.environ.get("S3_ACCESS_KEY", "kip"),
+    secret_key=os.environ.get("S3_SECRET_KEY", "kipkipkip"),
+    bucket=os.environ.get("S3_BUCKET", "sources"),
+)
+
+_EXTENSION_TO_TYPE = {"pdf": "pdf", "md": "markdown", "markdown": "markdown"}
+
+
+def get_upload_service(session: AsyncSession = Depends(get_db)) -> SourceUploadService:
+    return SourceUploadService(SqlAlchemyAsyncSourceRepository(session), _storage)
+
+
+@router.post("", response_model=SourceResponse, status_code=201)
+async def upload_source(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    _role: Role = Depends(require_permission(Permission.MANAGE_SOURCES)),
+    service: SourceUploadService = Depends(get_upload_service),
+) -> SourceResponse:
+    extension = (file.filename or "").rsplit(".", 1)[-1].lower()
+    source_type = _EXTENSION_TO_TYPE.get(extension, "markdown")
+    file_bytes = await file.read()
+
+    source = await service.upload(
+        workspace_id=workspace_id,
+        type=source_type,
+        filename=file.filename or "upload",
+        file_bytes=file_bytes,
+    )
+    extract_document.delay(source.id)
+    return SourceResponse(source_id=source.id, status=source.status, error=source.error)
+
+
+@router.get("/{source_id}", response_model=SourceResponse)
+async def get_source_status(
+    workspace_id: str,
+    source_id: str,
+    _role: Role = Depends(require_permission(Permission.VIEW_WORKSPACE)),
+    service: SourceUploadService = Depends(get_upload_service),
+) -> SourceResponse:
+    source = await service.get_status(source_id)
+    if source is None:
+        raise SourceNotFoundError(source_id)
+    return SourceResponse(source_id=source.id, status=source.status, error=source.error)
