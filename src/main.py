@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.auth.api import router as auth_router
 from app.shared.exceptions import register_exception_handlers
 from app.workspaces.api import router as workspaces_router
 from infrastructure.database.session import build_session_factory, session_holder
+from presentation.api.auth.router import router as auth_router
 from presentation.api.shared.error_handlers import register_domain_exception_handlers
 
 
