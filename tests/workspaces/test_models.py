@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import User
 from app.workspaces.models import Workspace, WorkspaceMember
+from infrastructure.database.auth.models import UserModel as User
 
 
 async def test_workspace_member_composite_key_is_unique(db_session: AsyncSession) -> None:

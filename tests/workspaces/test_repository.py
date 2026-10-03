@@ -1,10 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.models import User
 from app.workspaces.repository import (
     SqlAlchemyWorkspaceMemberRepository,
     SqlAlchemyWorkspaceRepository,
 )
+from infrastructure.database.auth.models import UserModel as User
 
 
 async def _make_user(db_session: AsyncSession, email: str) -> User:

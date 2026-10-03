@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.api import get_current_user_id
 from app.shared.db import get_db
 from app.workspaces.permissions import Permission, Role, require_permission
 from app.workspaces.repository import (
@@ -16,6 +15,7 @@ from app.workspaces.schemas import (
     WorkspaceResponse,
 )
 from app.workspaces.service import WorkspaceService
+from presentation.api.auth.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
 

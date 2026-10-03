@@ -5,9 +5,9 @@ from typing import Any
 from fastapi import Depends, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.api import get_current_user_id
 from app.shared.db import get_db
 from app.shared.exceptions import AppError
+from presentation.api.auth.dependencies import get_current_user_id
 
 
 class Role(str, Enum):
