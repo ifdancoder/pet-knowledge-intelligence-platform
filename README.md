@@ -59,6 +59,7 @@ PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 - `S3_ENDPOINT_URL`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` — object storage (MinIO locally, real S3 in prod)
 - `ELASTICSEARCH_URL` — search index
 - `EMBEDDING_PROVIDER` (`local` | `openai`) and `OPENAI_API_KEY` (only required if `openai`)
+- `EMBEDDING_DEVICE` (`cpu` | `cuda`, default `cpu`, only used by the `local` provider) — `cuda` is only safe if the worker's Celery pool is also switched away from the default prefork pool (e.g. `celery worker --pool=solo`), since torch forbids re-initializing CUDA inside a forked process
 
 ## API documentation
 

@@ -43,7 +43,7 @@ _loader_registry = SourceLoaderRegistry()
 _embedding_provider = (
     OpenAIEmbeddingProvider()
     if os.environ.get("EMBEDDING_PROVIDER", "local") == "openai"
-    else LocalEmbeddingProvider()
+    else LocalEmbeddingProvider(device=os.environ.get("EMBEDDING_DEVICE", "cpu"))
 )
 
 _RETRY_KWARGS = {
