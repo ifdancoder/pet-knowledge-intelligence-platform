@@ -1,5 +1,3 @@
-from ulid import ULID
+from shared.ids import generate_id
 
-
-def generate_id() -> str:
-    return str(ULID())
+__all__ = ["generate_id"]

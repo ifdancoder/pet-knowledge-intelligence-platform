@@ -3,7 +3,7 @@ import datetime
 from sqlalchemy import DateTime, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from app.shared.ids import generate_id
+from shared.ids import generate_id
 
 
 class Base(DeclarativeBase):

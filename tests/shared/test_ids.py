@@ -1,4 +1,4 @@
-from app.shared.ids import generate_id
+from shared.ids import generate_id
 
 
 def test_generate_id_is_26_chars() -> None:
