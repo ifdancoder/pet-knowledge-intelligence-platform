@@ -1,5 +1,7 @@
 from application.ingestion.services import (
     ExtractDocumentService,
+    GenerateEmbeddingsService,
+    IndexChunksService,
     NormalizeDocumentService,
     SplitIntoChunksService,
 )
@@ -73,6 +75,21 @@ class FakeSourceLoaderRegistry:
         return FakeSourceLoader()
 
 
+class FakeEmbeddingProvider:
+    dimension = 4
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [[float(len(t))] * 4 for t in texts]
+
+
+class FakeSearchIndexer:
+    def __init__(self) -> None:
+        self.indexed: list[Chunk] = []
+
+    def index_chunks(self, chunks: list[Chunk]) -> None:
+        self.indexed.extend(chunks)
+
+
 def test_extract_document_service_creates_a_document_and_advances_status() -> None:
     sources = FakeSourceRepository()
     documents = FakeDocumentRepository()
@@ -137,3 +154,50 @@ def test_split_into_chunks_service_persists_chunks_and_advances_status() -> None
     assert len(stored) == 1
     assert stored[0].text == "hello world"
     assert stored[0].workspace_id == "w1"
+
+
+def test_generate_embeddings_service_fills_in_embeddings_and_advances_status() -> None:
+    sources = FakeSourceRepository()
+    chunks = FakeChunkRepository()
+    source = Source.create(workspace_id="w1", type="markdown", storage_key="w1/a.md")
+    source.mark_extracting()
+    source.mark_normalizing()
+    source.mark_chunking()
+    sources.add(source)
+    chunks.add_many(
+        [Chunk(id="c1", source_id=source.id, document_id="d1", workspace_id="w1", order_index=0, text="hi")]
+    )
+
+    service = GenerateEmbeddingsService(sources, chunks, FakeEmbeddingProvider())
+    service.run(source.id)
+
+    assert sources.get_by_id(source.id).status == "embedding"
+    stored = chunks.list_by_source_id(source.id)
+    assert stored[0].embedding == [2.0] * 4
+
+
+def test_index_chunks_service_indexes_and_advances_status() -> None:
+    sources = FakeSourceRepository()
+    chunks = FakeChunkRepository()
+    source = Source.create(workspace_id="w1", type="markdown", storage_key="w1/a.md")
+    source.mark_extracting()
+    source.mark_normalizing()
+    source.mark_chunking()
+    source.mark_embedding()
+    sources.add(source)
+    chunks.add_many(
+        [
+            Chunk(
+                id="c1", source_id=source.id, document_id="d1", workspace_id="w1",
+                order_index=0, text="hi", embedding=[1.0] * 4,
+            )
+        ]
+    )
+
+    indexer = FakeSearchIndexer()
+    service = IndexChunksService(sources, chunks, indexer)
+    service.run(source.id)
+
+    assert sources.get_by_id(source.id).status == "indexed"
+    assert len(indexer.indexed) == 1
+    assert indexer.indexed[0].id == "c1"

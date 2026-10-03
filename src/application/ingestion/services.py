@@ -6,6 +6,8 @@ from domain.ingestion.entities import Chunk, Document
 from domain.ingestion.ports import (
     ChunkRepository,
     DocumentRepository,
+    EmbeddingProvider,
+    SearchIndexer,
     SourceLoader,
     SourceRepository,
     Storage,
@@ -14,8 +16,8 @@ from shared.ids import generate_id
 
 
 class SourceLoaderRegistryProtocol(Protocol):
-    """Narrow structural shape ExtractDocumentService depends on — avoids importing
-    the concrete infrastructure registry class into the application layer."""
+    """Narrow structural shape ExtractDocumentService depends on, so the application
+    layer does not need to import the concrete infrastructure registry class."""
 
     def get(self, source_type: str) -> SourceLoader: ...
 
@@ -99,4 +101,50 @@ class SplitIntoChunksService:
         self._chunks.add_many(chunk_entities)
 
         source.mark_chunking()
+        self._sources.update(source)
+
+
+class GenerateEmbeddingsService:
+    def __init__(
+        self, sources: SourceRepository, chunks: ChunkRepository, embedding_provider: EmbeddingProvider
+    ) -> None:
+        self._sources = sources
+        self._chunks = chunks
+        self._embedding_provider = embedding_provider
+
+    def run(self, source_id: str) -> None:
+        source = self._sources.get_by_id(source_id)
+        assert source is not None
+        if source.status != "chunking":
+            return
+
+        chunk_list = self._chunks.list_by_source_id(source_id)
+        vectors = self._embedding_provider.embed([c.text for c in chunk_list])
+        for chunk, vector in zip(chunk_list, vectors, strict=True):
+            chunk.embedding = vector
+        self._chunks.update_embeddings(chunk_list)
+
+        source.mark_embedding()
+        self._sources.update(source)
+
+
+class IndexChunksService:
+    def __init__(
+        self, sources: SourceRepository, chunks: ChunkRepository, search_indexer: SearchIndexer
+    ) -> None:
+        self._sources = sources
+        self._chunks = chunks
+        self._search_indexer = search_indexer
+
+    def run(self, source_id: str) -> None:
+        source = self._sources.get_by_id(source_id)
+        assert source is not None
+        if source.status != "embedding":
+            return
+
+        chunk_list = self._chunks.list_by_source_id(source_id)
+        self._search_indexer.index_chunks(chunk_list)
+
+        source.mark_indexing()
+        source.mark_indexed()
         self._sources.update(source)
