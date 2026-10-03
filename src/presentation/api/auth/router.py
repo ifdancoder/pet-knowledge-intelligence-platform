@@ -1,7 +1,20 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from application.auth.services import AuthService
+from application.auth.command_handlers import (
+    LoginCommandHandler,
+    LogoutCommandHandler,
+    RefreshCommandHandler,
+    RegisterUserCommandHandler,
+    VerifyEmailCommandHandler,
+)
+from application.auth.commands import (
+    LoginCommand,
+    LogoutCommand,
+    RefreshCommand,
+    RegisterUserCommand,
+    VerifyEmailCommand,
+)
 from infrastructure.database.auth.repository import (
     SqlAlchemyEmailVerificationTokenRepository,
     SqlAlchemyRefreshTokenRepository,
@@ -22,46 +35,65 @@ from presentation.api.auth.schemas import (
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-def get_auth_service(session: AsyncSession = Depends(get_db)) -> AuthService:
-    return AuthService(
-        users=SqlAlchemyUserRepository(session),
-        verification_tokens=SqlAlchemyEmailVerificationTokenRepository(session),
-        refresh_tokens=SqlAlchemyRefreshTokenRepository(session),
-        email_sender=ConsoleEmailSender(),
+def get_register_handler(session: AsyncSession = Depends(get_db)) -> RegisterUserCommandHandler:
+    return RegisterUserCommandHandler(
+        SqlAlchemyUserRepository(session),
+        SqlAlchemyEmailVerificationTokenRepository(session),
+        ConsoleEmailSender(),
     )
+
+
+def get_verify_email_handler(session: AsyncSession = Depends(get_db)) -> VerifyEmailCommandHandler:
+    return VerifyEmailCommandHandler(
+        SqlAlchemyUserRepository(session), SqlAlchemyEmailVerificationTokenRepository(session)
+    )
+
+
+def get_login_handler(session: AsyncSession = Depends(get_db)) -> LoginCommandHandler:
+    return LoginCommandHandler(SqlAlchemyUserRepository(session), SqlAlchemyRefreshTokenRepository(session))
+
+
+def get_refresh_handler(session: AsyncSession = Depends(get_db)) -> RefreshCommandHandler:
+    return RefreshCommandHandler(SqlAlchemyRefreshTokenRepository(session))
+
+
+def get_logout_handler(session: AsyncSession = Depends(get_db)) -> LogoutCommandHandler:
+    return LogoutCommandHandler(SqlAlchemyRefreshTokenRepository(session))
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 async def register(
-    payload: RegisterRequest, service: AuthService = Depends(get_auth_service)
+    payload: RegisterRequest, handler: RegisterUserCommandHandler = Depends(get_register_handler)
 ) -> RegisterResponse:
-    user_id = await service.register(email=payload.email, password=payload.password)
+    user_id = await handler.handle(RegisterUserCommand(email=payload.email, password=payload.password))
     return RegisterResponse(user_id=user_id)
 
 
 @router.post("/verify-email", status_code=204)
 async def verify_email(
-    payload: VerifyEmailRequest, service: AuthService = Depends(get_auth_service)
+    payload: VerifyEmailRequest, handler: VerifyEmailCommandHandler = Depends(get_verify_email_handler)
 ) -> None:
-    await service.verify_email(token=payload.token)
+    await handler.handle(VerifyEmailCommand(token=payload.token))
 
 
 @router.post("/login", response_model=TokenPairResponse)
 async def login(
-    payload: LoginRequest, service: AuthService = Depends(get_auth_service)
+    payload: LoginRequest, handler: LoginCommandHandler = Depends(get_login_handler)
 ) -> TokenPairResponse:
-    access_token, refresh_token = await service.login(email=payload.email, password=payload.password)
-    return TokenPairResponse(access_token=access_token, refresh_token=refresh_token)
+    tokens = await handler.handle(LoginCommand(email=payload.email, password=payload.password))
+    return TokenPairResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
-    payload: RefreshRequest, service: AuthService = Depends(get_auth_service)
+    payload: RefreshRequest, handler: RefreshCommandHandler = Depends(get_refresh_handler)
 ) -> TokenPairResponse:
-    access_token, refresh_token = await service.refresh(refresh_token=payload.refresh_token)
-    return TokenPairResponse(access_token=access_token, refresh_token=refresh_token)
+    tokens = await handler.handle(RefreshCommand(refresh_token=payload.refresh_token))
+    return TokenPairResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
 
 
 @router.post("/logout", status_code=204)
-async def logout(payload: LogoutRequest, service: AuthService = Depends(get_auth_service)) -> None:
-    await service.logout(refresh_token=payload.refresh_token)
+async def logout(
+    payload: LogoutRequest, handler: LogoutCommandHandler = Depends(get_logout_handler)
+) -> None:
+    await handler.handle(LogoutCommand(refresh_token=payload.refresh_token))
