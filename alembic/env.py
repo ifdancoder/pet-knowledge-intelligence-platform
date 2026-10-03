@@ -12,6 +12,7 @@ from alembic import context
 from infrastructure.database.auth import models as auth_models  # noqa: F401
 from infrastructure.database.base import Base
 from infrastructure.database.workspaces import models as workspace_models  # noqa: F401
+from infrastructure.ingestion import models as ingestion_models  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:
