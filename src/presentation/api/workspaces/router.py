@@ -1,7 +1,25 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from application.workspaces.services import WorkspaceService
+from application.workspaces.command_handlers import (
+    ChangeMemberRoleCommandHandler,
+    CreateWorkspaceCommandHandler,
+    DeleteWorkspaceCommandHandler,
+    InviteMemberCommandHandler,
+    RemoveMemberCommandHandler,
+)
+from application.workspaces.commands import (
+    ChangeMemberRoleCommand,
+    CreateWorkspaceCommand,
+    DeleteWorkspaceCommand,
+    InviteMemberCommand,
+    RemoveMemberCommand,
+)
+from application.workspaces.queries import GetWorkspaceByIdQuery, GetWorkspaceMembersQuery
+from application.workspaces.query_handlers import (
+    GetWorkspaceByIdQueryHandler,
+    GetWorkspaceMembersQueryHandler,
+)
 from domain.workspaces.entities import Permission, Role
 from infrastructure.database.session import get_db
 from infrastructure.database.workspaces.repository import SqlAlchemyWorkspaceRepository
@@ -18,17 +36,44 @@ from presentation.api.workspaces.schemas import (
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
 
 
-def get_workspace_service(session: AsyncSession = Depends(get_db)) -> WorkspaceService:
-    return WorkspaceService(SqlAlchemyWorkspaceRepository(session))
+def get_create_workspace_handler(session: AsyncSession = Depends(get_db)) -> CreateWorkspaceCommandHandler:
+    return CreateWorkspaceCommandHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_workspace_by_id_handler(session: AsyncSession = Depends(get_db)) -> GetWorkspaceByIdQueryHandler:
+    return GetWorkspaceByIdQueryHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_invite_member_handler(session: AsyncSession = Depends(get_db)) -> InviteMemberCommandHandler:
+    return InviteMemberCommandHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_workspace_members_handler(session: AsyncSession = Depends(get_db)) -> GetWorkspaceMembersQueryHandler:
+    return GetWorkspaceMembersQueryHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_change_member_role_handler(session: AsyncSession = Depends(get_db)) -> ChangeMemberRoleCommandHandler:
+    return ChangeMemberRoleCommandHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_remove_member_handler(session: AsyncSession = Depends(get_db)) -> RemoveMemberCommandHandler:
+    return RemoveMemberCommandHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_delete_workspace_handler(session: AsyncSession = Depends(get_db)) -> DeleteWorkspaceCommandHandler:
+    return DeleteWorkspaceCommandHandler(SqlAlchemyWorkspaceRepository(session))
 
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 async def create_workspace(
     payload: CreateWorkspaceRequest,
     user_id: str = Depends(get_current_user_id),
-    service: WorkspaceService = Depends(get_workspace_service),
+    command_handler: CreateWorkspaceCommandHandler = Depends(get_create_workspace_handler),
+    query_handler: GetWorkspaceByIdQueryHandler = Depends(get_workspace_by_id_handler),
 ) -> WorkspaceResponse:
-    workspace = await service.create_workspace(name=payload.name, owner_id=user_id)
+    workspace_id = await command_handler.handle(CreateWorkspaceCommand(name=payload.name, owner_id=user_id))
+    workspace = await query_handler.handle(GetWorkspaceByIdQuery(workspace_id))
+    assert workspace is not None
     return WorkspaceResponse(id=workspace.id, name=workspace.name, slug=workspace.slug)
 
 
@@ -38,10 +83,12 @@ async def invite_member(
     payload: InviteMemberRequest,
     user_id: str = Depends(get_current_user_id),
     _role: Role = Depends(require_permission(Permission.MANAGE_MEMBERS)),
-    service: WorkspaceService = Depends(get_workspace_service),
+    handler: InviteMemberCommandHandler = Depends(get_invite_member_handler),
 ) -> None:
-    await service.invite_member(
-        workspace_id=workspace_id, user_id=payload.user_id, role=payload.role, invited_by=user_id
+    await handler.handle(
+        InviteMemberCommand(
+            workspace_id=workspace_id, user_id=payload.user_id, role=payload.role, invited_by=user_id
+        )
     )
 
 
@@ -49,9 +96,9 @@ async def invite_member(
 async def list_members(
     workspace_id: str,
     _role: Role = Depends(require_permission(Permission.VIEW_WORKSPACE)),
-    service: WorkspaceService = Depends(get_workspace_service),
+    handler: GetWorkspaceMembersQueryHandler = Depends(get_workspace_members_handler),
 ) -> list[MemberResponse]:
-    members = await service.list_members(workspace_id=workspace_id)
+    members = await handler.handle(GetWorkspaceMembersQuery(workspace_id))
     return [MemberResponse(user_id=m.user_id, role=m.role) for m in members]
 
 
@@ -61,9 +108,11 @@ async def update_member_role(
     member_user_id: str,
     payload: UpdateMemberRoleRequest,
     _role: Role = Depends(require_permission(Permission.MANAGE_MEMBERS)),
-    service: WorkspaceService = Depends(get_workspace_service),
+    handler: ChangeMemberRoleCommandHandler = Depends(get_change_member_role_handler),
 ) -> None:
-    await service.change_role(workspace_id=workspace_id, user_id=member_user_id, role=payload.role)
+    await handler.handle(
+        ChangeMemberRoleCommand(workspace_id=workspace_id, user_id=member_user_id, role=payload.role)
+    )
 
 
 @router.delete("/{workspace_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -71,15 +120,15 @@ async def remove_member(
     workspace_id: str,
     member_user_id: str,
     _role: Role = Depends(require_permission(Permission.MANAGE_MEMBERS)),
-    service: WorkspaceService = Depends(get_workspace_service),
+    handler: RemoveMemberCommandHandler = Depends(get_remove_member_handler),
 ) -> None:
-    await service.remove_member(workspace_id=workspace_id, user_id=member_user_id)
+    await handler.handle(RemoveMemberCommand(workspace_id=workspace_id, user_id=member_user_id))
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workspace(
     workspace_id: str,
     _role: Role = Depends(require_permission(Permission.DELETE_WORKSPACE)),
-    service: WorkspaceService = Depends(get_workspace_service),
+    handler: DeleteWorkspaceCommandHandler = Depends(get_delete_workspace_handler),
 ) -> None:
-    await service.delete_workspace(workspace_id=workspace_id)
+    await handler.handle(DeleteWorkspaceCommand(workspace_id=workspace_id))
