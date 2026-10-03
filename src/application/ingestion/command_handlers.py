@@ -1,16 +1,20 @@
 import asyncio
 from typing import Protocol
 
+from starlette.concurrency import run_in_threadpool
+
 from application.ingestion.commands import (
     ExtractDocumentCommand,
     GenerateEmbeddingsCommand,
     IndexChunksCommand,
     NormalizeDocumentCommand,
     SplitIntoChunksCommand,
+    UploadSourceCommand,
 )
 from domain.ingestion.chunking import split_into_chunks
-from domain.ingestion.entities import Chunk, Document
+from domain.ingestion.entities import Chunk, Document, Source
 from domain.ingestion.ports import (
+    AsyncSourceRepository,
     ChunkRepository,
     DocumentRepository,
     EmbeddingProvider,
@@ -155,3 +159,16 @@ class IndexChunksCommandHandler:
         source.mark_indexing()
         source.mark_indexed()
         self._sources.update(source)
+
+
+class UploadSourceCommandHandler:
+    def __init__(self, sources: AsyncSourceRepository, storage: Storage) -> None:
+        self._sources = sources
+        self._storage = storage
+
+    async def handle(self, command: UploadSourceCommand) -> str:
+        source = Source.create(workspace_id=command.workspace_id, type=command.type, storage_key="")
+        source.storage_key = f"{command.workspace_id}/{source.id}-{command.filename}"
+        await self._sources.add(source)
+        await run_in_threadpool(self._storage.upload, source.storage_key, command.file_bytes)
+        return source.id

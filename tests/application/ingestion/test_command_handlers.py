@@ -4,6 +4,7 @@ from application.ingestion.command_handlers import (
     IndexChunksCommandHandler,
     NormalizeDocumentCommandHandler,
     SplitIntoChunksCommandHandler,
+    UploadSourceCommandHandler,
 )
 from application.ingestion.commands import (
     ExtractDocumentCommand,
@@ -11,6 +12,7 @@ from application.ingestion.commands import (
     IndexChunksCommand,
     NormalizeDocumentCommand,
     SplitIntoChunksCommand,
+    UploadSourceCommand,
 )
 from domain.ingestion.entities import Chunk, Document, Source
 
@@ -208,3 +210,41 @@ def test_index_chunks_command_handler_indexes_and_advances_status() -> None:
     assert sources.get_by_id(source.id).status == "indexed"
     assert len(indexer.indexed) == 1
     assert indexer.indexed[0].id == "c1"
+
+
+class FakeAsyncSourceRepository:
+    def __init__(self) -> None:
+        self.sources_by_id: dict[str, Source] = {}
+
+    async def add(self, source: Source) -> None:
+        self.sources_by_id[source.id] = source
+
+    async def get_by_id(self, source_id: str) -> Source | None:
+        return self.sources_by_id.get(source_id)
+
+
+class FakeAsyncStorage:
+    def __init__(self) -> None:
+        self.uploaded: dict[str, bytes] = {}
+
+    def upload(self, key: str, data: bytes) -> None:
+        self.uploaded[key] = data
+
+    def download(self, key: str) -> bytes:
+        return self.uploaded[key]
+
+
+async def test_upload_source_command_handler_creates_a_queued_source_and_stores_the_file() -> None:
+    sources = FakeAsyncSourceRepository()
+    storage = FakeAsyncStorage()
+    handler = UploadSourceCommandHandler(sources, storage)
+
+    source_id = await handler.handle(
+        UploadSourceCommand(workspace_id="w1", type="markdown", filename="notes.md", file_bytes=b"hello")
+    )
+
+    stored = await sources.get_by_id(source_id)
+    assert stored is not None
+    assert stored.status == "queued"
+    assert stored.workspace_id == "w1"
+    assert storage.uploaded[stored.storage_key] == b"hello"
