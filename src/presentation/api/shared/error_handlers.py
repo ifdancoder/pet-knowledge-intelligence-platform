@@ -11,8 +11,14 @@ from domain.auth.exceptions import (
     RefreshTokenReuseError,
 )
 from domain.shared.exceptions import DomainError
+from domain.workspaces.exceptions import (
+    InsufficientPermissionError,
+    LastOwnerError,
+    MemberNotFoundError,
+    NotAWorkspaceMemberError,
+    WorkspaceNotFoundError,
+)
 
-# Extended by Task 16 with workspace exceptions.
 EXCEPTION_STATUS: dict[type[DomainError], tuple[str, int]] = {
     EmailAlreadyRegisteredError: ("email_already_registered", 409),
     InvalidCredentialsError: ("invalid_credentials", 401),
@@ -21,6 +27,11 @@ EXCEPTION_STATUS: dict[type[DomainError], tuple[str, int]] = {
     RefreshTokenReuseError: ("refresh_token_reuse_detected", 401),
     InvalidAccessTokenError: ("invalid_access_token", 401),
     ExpiredAccessTokenError: ("access_token_expired", 401),
+    WorkspaceNotFoundError: ("workspace_not_found", 404),
+    MemberNotFoundError: ("member_not_found", 404),
+    LastOwnerError: ("cannot_remove_last_owner", 409),
+    NotAWorkspaceMemberError: ("not_a_workspace_member", 403),
+    InsufficientPermissionError: ("insufficient_permission", 403),
 }
 
 _DEFAULT_STATUS = 400

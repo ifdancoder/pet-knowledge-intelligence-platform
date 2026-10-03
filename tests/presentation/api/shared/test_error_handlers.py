@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from domain.auth.exceptions import EmailAlreadyRegisteredError
+from domain.workspaces.exceptions import NotAWorkspaceMemberError
 from presentation.api.shared.error_handlers import register_domain_exception_handlers
 
 
@@ -20,6 +21,21 @@ async def test_known_domain_error_maps_to_its_status_code() -> None:
     assert response.json() == {
         "error": {"code": "email_already_registered", "message": "a@example.com is already registered"}
     }
+
+
+async def test_workspace_domain_error_maps_to_its_status_code() -> None:
+    app = FastAPI()
+    register_domain_exception_handlers(app)
+
+    @app.get("/boom")
+    async def boom() -> None:
+        raise NotAWorkspaceMemberError("not a member of this workspace")
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/boom")
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "not_a_workspace_member"
 
 
 async def test_unhandled_exception_becomes_generic_500() -> None:
