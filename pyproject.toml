@@ -34,6 +34,7 @@ dev = [
     "testcontainers[minio,postgres]>=4.8",
     "ruff>=0.7",
     "mypy>=1.13",
+    "boto3-stubs[s3]>=1.43.108",
 ]
 
 [tool.pytest.ini_options]
