@@ -3,7 +3,10 @@ import os
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from application.ingestion.upload_service import SourceUploadService
+from application.ingestion.command_handlers import UploadSourceCommandHandler
+from application.ingestion.commands import UploadSourceCommand
+from application.ingestion.queries import GetSourceStatusQuery
+from application.ingestion.query_handlers import GetSourceStatusQueryHandler
 from domain.ingestion.exceptions import SourceNotFoundError
 from domain.workspaces.entities import Permission, Role
 from infrastructure.database.session import get_db
@@ -25,8 +28,12 @@ _storage = S3Storage(
 _EXTENSION_TO_TYPE = {"pdf": "pdf", "md": "markdown", "markdown": "markdown"}
 
 
-def get_upload_service(session: AsyncSession = Depends(get_db)) -> SourceUploadService:
-    return SourceUploadService(SqlAlchemyAsyncSourceRepository(session), _storage)
+def get_upload_handler(session: AsyncSession = Depends(get_db)) -> UploadSourceCommandHandler:
+    return UploadSourceCommandHandler(SqlAlchemyAsyncSourceRepository(session), _storage)
+
+
+def get_status_handler(session: AsyncSession = Depends(get_db)) -> GetSourceStatusQueryHandler:
+    return GetSourceStatusQueryHandler(SqlAlchemyAsyncSourceRepository(session))
 
 
 @router.post("", response_model=SourceResponse, status_code=201)
@@ -34,20 +41,22 @@ async def upload_source(
     workspace_id: str,
     file: UploadFile = File(...),
     _role: Role = Depends(require_permission(Permission.MANAGE_SOURCES)),
-    service: SourceUploadService = Depends(get_upload_service),
+    handler: UploadSourceCommandHandler = Depends(get_upload_handler),
 ) -> SourceResponse:
     extension = (file.filename or "").rsplit(".", 1)[-1].lower()
     source_type = _EXTENSION_TO_TYPE.get(extension, "markdown")
     file_bytes = await file.read()
 
-    source = await service.upload(
-        workspace_id=workspace_id,
-        type=source_type,
-        filename=file.filename or "upload",
-        file_bytes=file_bytes,
+    source_id = await handler.handle(
+        UploadSourceCommand(
+            workspace_id=workspace_id,
+            type=source_type,
+            filename=file.filename or "upload",
+            file_bytes=file_bytes,
+        )
     )
-    extract_document.delay(source.id)
-    return SourceResponse(source_id=source.id, status=source.status, error=source.error)
+    extract_document.delay(source_id)
+    return SourceResponse(source_id=source_id, status="queued", error=None)
 
 
 @router.get("/{source_id}", response_model=SourceResponse)
@@ -55,9 +64,9 @@ async def get_source_status(
     workspace_id: str,
     source_id: str,
     _role: Role = Depends(require_permission(Permission.VIEW_WORKSPACE)),
-    service: SourceUploadService = Depends(get_upload_service),
+    handler: GetSourceStatusQueryHandler = Depends(get_status_handler),
 ) -> SourceResponse:
-    source = await service.get_status(source_id)
+    source = await handler.handle(GetSourceStatusQuery(source_id))
     if source is None:
         raise SourceNotFoundError(source_id)
     return SourceResponse(source_id=source.id, status=source.status, error=source.error)
