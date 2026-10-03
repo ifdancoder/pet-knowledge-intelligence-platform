@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from testcontainers.postgres import PostgresContainer
 
-from app.shared.db import get_db
 from infrastructure.database.base import Base
+from infrastructure.database.session import get_db
 from main import create_app
 
 os.environ.setdefault("JWT_SECRET", "test-secret-do-not-use-in-production")

@@ -8,20 +8,24 @@ Python 3.13, FastAPI, Pydantic v2, SQLAlchemy 2.0 (async, asyncpg), Alembic, Pos
 
 ## Key engineering decisions
 
+- **Hexagonal/Clean Architecture.** Domain entities are plain dataclasses, decoupled from SQLAlchemy; `Workspace` is an aggregate root enforcing its own invariants (e.g. the last-owner rule). Repository adapters map ORM rows to domain entities explicitly at the infrastructure boundary.
 - **Refresh token rotation with reuse detection.** Each refresh issues a new refresh token and revokes the old one; presenting an already-revoked token is treated as a compromise signal and revokes the entire token chain for that user.
 - **RBAC via a composable FastAPI dependency.** `require_permission(permission)` resolves the caller's workspace membership and checks it against a static `role -> permissions` table, rather than a bespoke authorization layer.
 - **EmailSender as a Strategy.** Email verification goes through an `EmailSender` Protocol; the only implementation today is `ConsoleEmailSender` (logs instead of sending), so a real SMTP/SES sender can be added later without touching the service layer.
-- **ULIDs for all entity IDs**, generated application-side, sortable by creation time.
+- **ULIDs for all entity IDs**, assigned by domain factory methods at creation time (not generated as a database default), sortable by creation time.
 - **Cascade deletes for workspace membership.** Deleting a workspace cascades to its `workspace_members` rows at the database level, rather than requiring the application to clean them up first.
 
 ## Project structure
 
-- `src/app/auth/` — registration, email verification, login, refresh/logout, JWT and password hashing
-- `src/app/workspaces/` — workspaces, membership, roles/permissions
-- `src/app/shared/` — cross-feature pieces: DB session handling, ULID generation, error handling, pagination
-- `src/infrastructure/database/` — SQLAlchemy declarative base and mixins
-- `alembic/` — database migrations
-- `tests/` — pytest suite, mirrors the `src/app` structure
+Hexagonal/Clean Architecture, organized by layer with feature sub-packages nested inside each:
+
+- `src/domain/` — plain-Python entities and aggregates (`User`, `Workspace`), domain exceptions, and ports (`Protocol` interfaces). No framework or ORM imports.
+- `src/application/` — use-case services (`AuthService`, `WorkspaceService`) orchestrating domain entities through ports.
+- `src/infrastructure/` — adapters: SQLAlchemy ORM models and repositories, password/JWT utilities, the console email sender.
+- `src/presentation/api/` — FastAPI routers, Pydantic request/response schemas, dependency wiring, and the domain-error-to-HTTP mapping.
+- `src/shared/` — small cross-cutting utilities used by multiple layers (ULID generation).
+- `alembic/` — database migrations.
+- `tests/` — pytest suite, mirrors the `src/` layer structure (`tests/domain/`, `tests/application/`, `tests/infrastructure/`, `tests/presentation/`).
 
 ## How to run
 
