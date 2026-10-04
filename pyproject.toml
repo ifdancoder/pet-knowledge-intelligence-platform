@@ -33,6 +33,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.66b0",
     "opentelemetry-instrumentation-celery>=0.66b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
+    "sentry-sdk>=2.71.0",
 ]
 
 [dependency-groups]
