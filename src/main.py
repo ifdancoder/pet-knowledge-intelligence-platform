@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from infrastructure.database.session import build_session_factory, session_holder
 from presentation.api.auth.router import router as auth_router
+from presentation.api.search.router import router as search_router
 from presentation.api.shared.error_handlers import register_domain_exception_handlers
 from presentation.api.sources.router import router as sources_router
 from presentation.api.workspaces.router import router as workspaces_router
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(workspaces_router)
     app.include_router(sources_router)
+    app.include_router(search_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
