@@ -17,6 +17,7 @@ from testcontainers.postgres import PostgresContainer
 from infrastructure.database.base import Base
 from infrastructure.database.session import get_db
 from main import create_app
+from presentation.api.auth.dependencies import get_rate_limiter
 
 os.environ.setdefault("JWT_SECRET", "test-secret-do-not-use-in-production")
 
@@ -75,6 +76,11 @@ def sync_db_session(sync_engine) -> Iterator[Session]:
     connection.close()
 
 
+class _AlwaysAllowRateLimiter:
+    async def check(self, *, key: str, limit: int, window_seconds: int) -> bool:
+        return True
+
+
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     app = create_app()
@@ -83,6 +89,7 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_rate_limiter] = lambda: _AlwaysAllowRateLimiter()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as test_client:
         yield test_client

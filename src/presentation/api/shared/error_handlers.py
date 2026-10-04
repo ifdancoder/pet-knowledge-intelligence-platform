@@ -8,6 +8,7 @@ from domain.auth.exceptions import (
     InvalidAccessTokenError,
     InvalidCredentialsError,
     InvalidOrExpiredTokenError,
+    RateLimitExceededError,
     RefreshTokenReuseError,
 )
 from domain.conversations.exceptions import ConversationNotFoundError, NotConversationOwnerError
@@ -37,6 +38,7 @@ EXCEPTION_STATUS: dict[type[DomainError], tuple[str, int]] = {
     SourceNotFoundError: ("source_not_found", 404),
     ConversationNotFoundError: ("conversation_not_found", 404),
     NotConversationOwnerError: ("not_conversation_owner", 403),
+    RateLimitExceededError: ("rate_limit_exceeded", 429),
 }
 
 _DEFAULT_STATUS = 400

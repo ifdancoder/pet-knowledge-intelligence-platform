@@ -22,6 +22,7 @@ from infrastructure.database.auth.repository import (
 )
 from infrastructure.database.session import get_db
 from infrastructure.email.console_sender import ConsoleEmailSender
+from presentation.api.auth.dependencies import rate_limit
 from presentation.api.auth.schemas import (
     LoginRequest,
     LogoutRequest,
@@ -63,7 +64,9 @@ def get_logout_handler(session: AsyncSession = Depends(get_db)) -> LogoutCommand
 
 @router.post("/register", response_model=RegisterResponse, status_code=201)
 async def register(
-    payload: RegisterRequest, handler: RegisterUserCommandHandler = Depends(get_register_handler)
+    payload: RegisterRequest,
+    handler: RegisterUserCommandHandler = Depends(get_register_handler),
+    _rl: None = Depends(rate_limit(limit=5, window_seconds=60)),
 ) -> RegisterResponse:
     user_id = await handler.handle(RegisterUserCommand(email=payload.email, password=payload.password))
     return RegisterResponse(user_id=user_id)
@@ -78,7 +81,9 @@ async def verify_email(
 
 @router.post("/login", response_model=TokenPairResponse)
 async def login(
-    payload: LoginRequest, handler: LoginCommandHandler = Depends(get_login_handler)
+    payload: LoginRequest,
+    handler: LoginCommandHandler = Depends(get_login_handler),
+    _rl: None = Depends(rate_limit(limit=5, window_seconds=60)),
 ) -> TokenPairResponse:
     tokens = await handler.handle(LoginCommand(email=payload.email, password=payload.password))
     return TokenPairResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
@@ -86,7 +91,9 @@ async def login(
 
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
-    payload: RefreshRequest, handler: RefreshCommandHandler = Depends(get_refresh_handler)
+    payload: RefreshRequest,
+    handler: RefreshCommandHandler = Depends(get_refresh_handler),
+    _rl: None = Depends(rate_limit(limit=5, window_seconds=60)),
 ) -> TokenPairResponse:
     tokens = await handler.handle(RefreshCommand(refresh_token=payload.refresh_token))
     return TokenPairResponse(access_token=tokens.access_token, refresh_token=tokens.refresh_token)
