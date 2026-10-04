@@ -10,6 +10,7 @@ from domain.auth.exceptions import (
     InvalidOrExpiredTokenError,
     RefreshTokenReuseError,
 )
+from domain.conversations.exceptions import ConversationNotFoundError, NotConversationOwnerError
 from domain.ingestion.exceptions import SourceNotFoundError
 from domain.shared.exceptions import DomainError
 from domain.workspaces.exceptions import (
@@ -34,6 +35,8 @@ EXCEPTION_STATUS: dict[type[DomainError], tuple[str, int]] = {
     NotAWorkspaceMemberError: ("not_a_workspace_member", 403),
     InsufficientPermissionError: ("insufficient_permission", 403),
     SourceNotFoundError: ("source_not_found", 404),
+    ConversationNotFoundError: ("conversation_not_found", 404),
+    NotConversationOwnerError: ("not_conversation_owner", 403),
 }
 
 _DEFAULT_STATUS = 400
