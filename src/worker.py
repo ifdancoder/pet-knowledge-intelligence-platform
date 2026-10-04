@@ -3,6 +3,10 @@ import os
 from celery import Celery
 from kombu import Exchange, Queue
 
+from infrastructure.observability.bootstrap import configure_observability
+
+configure_observability(service_name="kip-worker")
+
 app = Celery("ingestion", broker=os.environ.get("RABBITMQ_URL", "amqp://kip:kip@localhost:5673//"))
 
 _dead_letter_exchange = Exchange("ingestion.dlx", type="direct")

@@ -31,6 +31,8 @@ dependencies = [
     "opentelemetry-sdk>=1.45.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.45.0",
     "opentelemetry-instrumentation-fastapi>=0.66b0",
+    "opentelemetry-instrumentation-celery>=0.66b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
 ]
 
 [dependency-groups]
@@ -70,6 +72,13 @@ mypy_path = "src"
 [[tool.mypy.overrides]]
 module = ["celery.*", "kombu.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# opentelemetry-instrumentation-celery ships no py.typed marker, so its
+# BaseInstrumentor.instrument() is seen as untyped under strict mode no
+# matter how the call site is annotated.
+module = "infrastructure.observability.tracing"
+disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # Celery's @app.task has no type stubs, so its decorated functions are

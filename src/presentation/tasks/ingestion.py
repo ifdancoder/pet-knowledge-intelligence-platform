@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 import redis
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -36,6 +37,7 @@ _sync_database_url = os.environ.get(
     "SYNC_DATABASE_URL", "postgresql+psycopg2://kip:kip@localhost:5434/kip"
 )
 _engine = create_engine(_sync_database_url)
+SQLAlchemyInstrumentor().instrument(engine=_engine)
 _SessionLocal = sessionmaker(bind=_engine)
 
 _storage = S3Storage(
