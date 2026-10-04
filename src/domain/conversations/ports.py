@@ -1,0 +1,19 @@
+from collections.abc import AsyncIterator
+from typing import Protocol
+
+from domain.conversations.entities import Conversation, Message
+
+
+class ConversationRepository(Protocol):
+    async def add(self, conversation: Conversation) -> None: ...
+    async def get_by_id(self, conversation_id: str) -> Conversation | None: ...
+    async def list_by_workspace_and_user(self, workspace_id: str, user_id: str) -> list[Conversation]: ...
+
+
+class MessageRepository(Protocol):
+    async def add(self, message: Message) -> None: ...
+    async def list_by_conversation_id(self, conversation_id: str) -> list[Message]: ...
+
+
+class LLMProvider(Protocol):
+    def stream(self, *, system: str, messages: list[dict[str, str]]) -> AsyncIterator[str]: ...
