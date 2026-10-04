@@ -34,6 +34,8 @@ dependencies = [
     "opentelemetry-instrumentation-celery>=0.66b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
     "sentry-sdk>=2.71.0",
+    "prometheus-client>=0.26.0",
+    "prometheus-fastapi-instrumentator>=8.1.0",
 ]
 
 [dependency-groups]

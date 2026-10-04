@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator.metrics import default as default_metrics
 
 from infrastructure.database.session import build_session_factory, session_holder
 from infrastructure.observability.bootstrap import configure_observability
@@ -16,6 +18,10 @@ from presentation.api.workspaces.router import router as workspaces_router
 
 configure_observability(service_name="kip-api")
 
+_instrumentator = Instrumentator()
+_instrumentator.add(default_metrics())
+_instrumented = False
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -24,6 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    global _instrumented
     app = FastAPI(title="Knowledge Intelligence Platform", lifespan=lifespan)
     register_domain_exception_handlers(app)
     app.include_router(auth_router)
@@ -32,6 +39,11 @@ def create_app() -> FastAPI:
     app.include_router(search_router)
     app.include_router(conversations_router)
     FastAPIInstrumentor.instrument_app(app)
+
+    if not _instrumented:
+        _instrumentator.instrument(app)
+        _instrumented = True
+    _instrumentator.expose(app)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
