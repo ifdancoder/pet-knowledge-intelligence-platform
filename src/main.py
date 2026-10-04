@@ -2,21 +2,28 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from infrastructure.observability.bootstrap import configure_observability
+
+# Called before any other project import: presentation.api.sources.router
+# transitively imports worker.py (for its own configure_observability() call,
+# service_name="kip-worker"), and OpenTelemetry's set_tracer_provider() only
+# takes effect on its first call per process — whichever call runs first wins
+# permanently. Importing anything else first would silently mislabel every
+# span this process produces as "kip-worker" instead of "kip-api".
+configure_observability(service_name="kip-api")
+
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_fastapi_instrumentator.metrics import default as default_metrics
 
 from infrastructure.database.session import build_session_factory, session_holder
-from infrastructure.observability.bootstrap import configure_observability
 from presentation.api.auth.router import router as auth_router
 from presentation.api.conversations.router import router as conversations_router
 from presentation.api.search.router import router as search_router
 from presentation.api.shared.error_handlers import register_domain_exception_handlers
 from presentation.api.sources.router import router as sources_router
 from presentation.api.workspaces.router import router as workspaces_router
-
-configure_observability(service_name="kip-api")
 
 _instrumentator = Instrumentator()
 _instrumentator.add(default_metrics())

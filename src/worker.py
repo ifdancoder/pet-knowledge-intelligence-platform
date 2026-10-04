@@ -2,7 +2,7 @@ import os
 import time
 
 from celery import Celery
-from celery.signals import task_postrun, task_prerun
+from celery.signals import task_postrun, task_prerun, worker_ready
 from kombu import Exchange, Queue
 from prometheus_client import start_http_server
 
@@ -33,9 +33,17 @@ app.conf.task_default_exchange = "ingestion"
 app.conf.task_default_routing_key = "ingestion"
 app.conf.imports = ("presentation.tasks.ingestion",)
 
-start_http_server(int(os.environ.get("METRICS_PORT", "9001")))
-
 _task_start_times: dict[str, float] = {}
+
+
+@worker_ready.connect
+def _start_metrics_server(sender: object = None, **kwargs: object) -> None:
+    # worker_ready only fires inside an actual running `celery worker` process,
+    # never when this module is merely imported (e.g. by the API, which imports
+    # `worker.app` transitively via presentation/tasks/ingestion.py to call
+    # .delay()) — importing must never bind a port, only actually running as a
+    # worker should.
+    start_http_server(int(os.environ.get("METRICS_PORT", "9001")))
 
 
 @task_prerun.connect
