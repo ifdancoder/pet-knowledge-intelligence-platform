@@ -29,6 +29,8 @@ dependencies = [
     "ollama>=0.6.3",
     "opentelemetry-api>=1.45.0",
     "opentelemetry-sdk>=1.45.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.45.0",
+    "opentelemetry-instrumentation-fastapi>=0.66b0",
 ]
 
 [dependency-groups]
