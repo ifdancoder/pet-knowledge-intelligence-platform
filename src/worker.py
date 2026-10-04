@@ -4,6 +4,7 @@ import time
 from celery import Celery
 from celery.signals import task_postrun, task_prerun
 from kombu import Exchange, Queue
+from prometheus_client import start_http_server
 
 from infrastructure.observability.bootstrap import configure_observability
 from infrastructure.observability.metrics import ingestion_stage_duration_seconds
@@ -31,6 +32,8 @@ app.conf.task_default_queue = "ingestion"
 app.conf.task_default_exchange = "ingestion"
 app.conf.task_default_routing_key = "ingestion"
 app.conf.imports = ("presentation.tasks.ingestion",)
+
+start_http_server(int(os.environ.get("METRICS_PORT", "9001")))
 
 _task_start_times: dict[str, float] = {}
 
