@@ -1,8 +1,8 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domain.ingestion.entities import Source
-from infrastructure.ingestion.models import SourceModel
+from domain.ingestion.entities import Chunk, Source
+from infrastructure.ingestion.models import ChunkModel, SourceModel
 
 
 class SqlAlchemyAsyncSourceRepository:
@@ -34,3 +34,18 @@ class SqlAlchemyAsyncSourceRepository:
             status=model.status,
             error=model.error,
         )
+
+
+class SqlAlchemyAsyncChunkRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_by_ids(self, chunk_ids: list[str]) -> list[Chunk]:
+        result = await self._session.execute(select(ChunkModel).where(ChunkModel.id.in_(chunk_ids)))
+        return [
+            Chunk(
+                id=m.id, source_id=m.source_id, document_id=m.document_id, workspace_id=m.workspace_id,
+                order_index=m.order_index, text=m.text, embedding=m.embedding,
+            )
+            for m in result.scalars().all()
+        ]

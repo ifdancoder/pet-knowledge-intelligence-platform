@@ -51,3 +51,9 @@ class AsyncSourceRepository(Protocol):
 
     async def add(self, source: Source) -> None: ...
     async def get_by_id(self, source_id: str) -> Source | None: ...
+
+
+class AsyncChunkRepository(Protocol):
+    """Async — used only by Search's read path, mirrors AsyncSourceRepository."""
+
+    async def get_by_ids(self, chunk_ids: list[str]) -> list[Chunk]: ...
