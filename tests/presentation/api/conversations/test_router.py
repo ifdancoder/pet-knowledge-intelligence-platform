@@ -126,3 +126,52 @@ async def test_a_non_owner_cannot_read_another_user_s_conversation(
         headers=_auth_header(intruder_token),
     )
     assert response.status_code in (403, 404)
+
+
+async def test_send_message_records_the_rag_generation_duration_metric(
+    client: AsyncClient, caplog: logging.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import presentation.api.conversations.router as conversations_router
+    import presentation.api.search.router as search_router
+    from infrastructure.observability.metrics import rag_generation_duration_seconds
+
+    fake_llm = MagicMock()
+
+    async def fake_stream(*, system: str, messages: list[dict[str, str]]):
+        yield "ok"
+
+    fake_llm.stream = fake_stream
+    monkeypatch.setattr(conversations_router, "_llm", fake_llm)
+
+    fake_keyword = MagicMock()
+    fake_keyword.search.return_value = []
+    monkeypatch.setattr(search_router, "_keyword_search", fake_keyword)
+    monkeypatch.setattr(search_router, "_embedding_provider", MagicMock(embed=lambda texts: [[0.1] * 1536]))
+    fake_reranker = MagicMock()
+    fake_reranker.rerank.side_effect = lambda *, query, results, limit: results[:limit]
+    monkeypatch.setattr(search_router, "_reranker", fake_reranker)
+
+    await _register_and_verify(client, "metrics-owner@example.com", caplog)
+    owner_token = await _login(client, "metrics-owner@example.com")
+    create_workspace = await client.post(
+        "/api/v1/workspaces", json={"name": "MetricsCo"}, headers=_auth_header(owner_token)
+    )
+    workspace_id = create_workspace.json()["id"]
+    create_conversation = await client.post(
+        f"/api/v1/workspaces/{workspace_id}/conversations", headers=_auth_header(owner_token)
+    )
+    conversation_id = create_conversation.json()["id"]
+
+    count_before = next(s.value for s in rag_generation_duration_seconds._child_samples() if s.name == "_count")
+
+    async with client.stream(
+        "POST",
+        f"/api/v1/workspaces/{workspace_id}/conversations/{conversation_id}/messages",
+        json={"content": "hi"},
+        headers=_auth_header(owner_token),
+    ) as response:
+        async for _ in response.aiter_text():
+            pass
+
+    count_after = next(s.value for s in rag_generation_duration_seconds._child_samples() if s.name == "_count")
+    assert count_after == count_before + 1

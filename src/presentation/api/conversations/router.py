@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends
@@ -25,6 +26,7 @@ from infrastructure.conversations.async_repository import (
 from infrastructure.conversations.llm.anthropic_provider import AnthropicLLMProvider
 from infrastructure.conversations.llm.ollama_provider import OllamaLLMProvider
 from infrastructure.database.session import get_db
+from infrastructure.observability.metrics import rag_generation_duration_seconds
 from presentation.api.auth.dependencies import get_current_user_id
 from presentation.api.conversations.schemas import (
     ConversationResponse,
@@ -136,14 +138,17 @@ async def send_message(
     )
 
     async def event_stream() -> AsyncIterator[str]:
+        start = time.monotonic()
         try:
             async for delta in reply_service.stream(conversation_id=conversation_id, workspace_id=workspace_id):
                 yield f"data: {json.dumps({'delta': delta})}\n\n"
         except Exception as exc:  # noqa: BLE001 — fail-fast boundary: any failure once
             # streaming has started (headers are already sent) must become an SSE
             # error event rather than an unhandled 500, so this is deliberately broad.
+            rag_generation_duration_seconds.observe(time.monotonic() - start)
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
             return
+        rag_generation_duration_seconds.observe(time.monotonic() - start)
         yield f"data: {json.dumps({'done': True, 'message_id': message_id})}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

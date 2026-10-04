@@ -88,3 +88,9 @@ disallow_untyped_calls = false
 # untyped under strict mode no matter how the function itself is annotated.
 module = "presentation.tasks.ingestion"
 disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+# Same reasoning as above: celery.signals.task_prerun/task_postrun.connect
+# are untyped decorators.
+module = "worker"
+disallow_untyped_decorators = false

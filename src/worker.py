@@ -1,9 +1,12 @@
 import os
+import time
 
 from celery import Celery
+from celery.signals import task_postrun, task_prerun
 from kombu import Exchange, Queue
 
 from infrastructure.observability.bootstrap import configure_observability
+from infrastructure.observability.metrics import ingestion_stage_duration_seconds
 
 configure_observability(service_name="kip-worker")
 
@@ -28,3 +31,24 @@ app.conf.task_default_queue = "ingestion"
 app.conf.task_default_exchange = "ingestion"
 app.conf.task_default_routing_key = "ingestion"
 app.conf.imports = ("presentation.tasks.ingestion",)
+
+_task_start_times: dict[str, float] = {}
+
+
+@task_prerun.connect
+def _record_task_start(
+    sender: object = None, task_id: str | None = None, task: object = None, **kwargs: object
+) -> None:
+    if task_id is not None:
+        _task_start_times[task_id] = time.monotonic()
+
+
+@task_postrun.connect
+def _record_task_duration(
+    sender: object = None, task_id: str | None = None, task: object = None, **kwargs: object
+) -> None:
+    if task_id is None:
+        return
+    start = _task_start_times.pop(task_id, None)
+    if start is not None and task is not None:
+        ingestion_stage_duration_seconds.labels(stage=task.name).observe(time.monotonic() - start)  # type: ignore[attr-defined]
