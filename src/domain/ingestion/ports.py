@@ -36,7 +36,7 @@ class EmbeddingProvider(Protocol):
 
 
 class SearchIndexer(Protocol):
-    def index_chunks(self, chunks: list[Chunk]) -> None: ...
+    def index_chunks(self, chunks: list[Chunk], source_type: str) -> None: ...
 
 
 class Storage(Protocol):

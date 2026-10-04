@@ -94,9 +94,11 @@ class FakeEmbeddingProvider:
 class FakeSearchIndexer:
     def __init__(self) -> None:
         self.indexed: list[Chunk] = []
+        self.last_source_type: str | None = None
 
-    def index_chunks(self, chunks: list[Chunk]) -> None:
+    def index_chunks(self, chunks: list[Chunk], source_type: str) -> None:
         self.indexed.extend(chunks)
+        self.last_source_type = source_type
 
 
 def test_extract_document_command_handler_creates_a_document_and_advances_status() -> None:
@@ -210,6 +212,7 @@ def test_index_chunks_command_handler_indexes_and_advances_status() -> None:
     assert sources.get_by_id(source.id).status == "indexed"
     assert len(indexer.indexed) == 1
     assert indexer.indexed[0].id == "c1"
+    assert indexer.last_source_type == "markdown"
 
 
 class FakeAsyncSourceRepository:

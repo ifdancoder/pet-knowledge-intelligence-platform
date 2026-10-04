@@ -101,9 +101,11 @@ class FakeEmbeddingProvider:
 class FakeSearchIndexer:
     def __init__(self) -> None:
         self.indexed: list[Chunk] = []
+        self.last_source_type: str | None = None
 
-    def index_chunks(self, chunks: list[Chunk]) -> None:
+    def index_chunks(self, chunks: list[Chunk], source_type: str) -> None:
         self.indexed.extend(chunks)
+        self.last_source_type = source_type
 
 
 @pytest.fixture(autouse=True)

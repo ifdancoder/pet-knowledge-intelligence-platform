@@ -154,7 +154,7 @@ class IndexChunksCommandHandler:
             return
 
         chunk_list = self._chunks.list_by_source_id(command.source_id)
-        self._search_indexer.index_chunks(chunk_list)
+        self._search_indexer.index_chunks(chunk_list, source.type)
 
         source.mark_indexing()
         source.mark_indexed()
