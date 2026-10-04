@@ -27,3 +27,7 @@ class InvalidAccessTokenError(DomainError):
 
 class ExpiredAccessTokenError(DomainError):
     pass
+
+
+class RateLimitExceededError(DomainError):
+    pass
