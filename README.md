@@ -42,6 +42,8 @@ Hexagonal/Clean Architecture, organized by layer with feature sub-packages neste
 - `src/infrastructure/observability/` — structured logging, OpenTelemetry tracing setup, custom Prometheus metrics, Sentry init, composed by one `configure_observability()` bootstrap called from both `main.py` and `worker.py`.
 - `src/infrastructure/ratelimit/` — the `RateLimiter` port and its Redis-backed implementation.
 - `observability/` — checked-in Tempo/Prometheus config and Grafana datasource/dashboard provisioning, mounted into their respective containers by `docker-compose.yml`.
+- `Dockerfile` — multi-stage build (plain `python:3.13-slim`, GPU support via PyTorch's own CUDA wheel, no CUDA base image needed), shared by the API and worker; same image, different command.
+- `k8s/` — plain Kubernetes manifests (no Helm) for the entire stack, one `kip` namespace.
 - `src/worker.py` — Celery app factory (the worker's composition root, parallel to `main.py` for the API).
 - `src/shared/` — small cross-cutting utilities used by multiple layers (ULID generation).
 - `alembic/` — database migrations.
@@ -75,12 +77,46 @@ PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 - `ELASTICSEARCH_URL` — search index
 - `EMBEDDING_PROVIDER` (`local` | `openai`) and `OPENAI_API_KEY` (only required if `openai`)
 - `EMBEDDING_DEVICE` (`cpu` | `cuda`, default `cpu`, only used by the `local` provider) — `cuda` is only safe if the worker's Celery pool is also switched away from the default prefork pool (e.g. `celery worker --pool=solo`), since torch forbids re-initializing CUDA inside a forked process
+- `RERANKER_DEVICE` (`cpu` | `cuda`, default `cpu`) — device for the cross-encoder reranker; runs inside the API process, which never forks per-request, so `cuda` carries none of `EMBEDDING_DEVICE`'s fork-safety hazard
 - `LLM_PROVIDER` (`local` | `anthropic`, default `local`) — which LLM backend generates conversation replies
 - `OLLAMA_URL`, `OLLAMA_MODEL` (default `llama3.2:1b`) — only used by the `local` provider; run `docker compose exec ollama ollama pull llama3.2:1b` once after first starting the stack
 - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-sonnet-5`) — only required if `anthropic`
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — where traces are exported (default `http://localhost:4317`, Tempo's OTLP gRPC port); if unreachable, spans are silently dropped rather than breaking a request
 - `SENTRY_DSN` — optional; unset or empty means Sentry is a no-op
 - `METRICS_PORT` — the Celery worker's own Prometheus metrics server port (default `9001`), separate from the API's `/metrics`
+
+## GPU support
+
+The `Dockerfile` is plain `python:3.13-slim` — no CUDA base image needed, since PyTorch's CUDA wheel (already what `uv.lock` resolves by default) bundles its own CUDA runtime via pip. Verified empirically on this machine: a throwaway image on this base, run with `--gpus all`, correctly reported `torch.cuda.is_available() == True` and named the host's GPU.
+
+GPU passthrough into a plain `docker run`/Kubernetes container still requires `nvidia-container-toolkit` on the host:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Verify it worked: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` should print your GPU. In Kubernetes, GPU scheduling additionally requires the cluster to have the NVIDIA device plugin installed — without it, the `api`, `worker`, and `ollama` Pods (each requesting `nvidia.com/gpu: 1`) stay `Pending` with an `Insufficient nvidia.com/gpu` event. `EMBEDDING_DEVICE=cuda` requires the worker to run with Celery's `--pool=solo` (not the default prefork pool), since torch forbids re-initializing CUDA inside a forked process — the `worker` Deployment in `k8s/worker.yaml` already overrides the command for this reason.
+
+## Kubernetes
+
+Plain manifests (no Helm) in `k8s/`, covering the entire stack — every infrastructure dependency plus the API and worker — in one `kip` namespace: `StatefulSet`s with `volumeClaimTemplates` for the four components where losing data on restart would hurt (`postgres`, `minio`, `elasticsearch`, `ollama`'s model cache), plain `Deployment`s for everything else, a `ConfigMap` (`kip-config`) for non-secret environment variables pointing at cluster-internal DNS names (`postgres.kip.svc.cluster.local`, etc.), and one `Secret` (`kip-secrets`) checked in with placeholder/local-dev values — fill in real ones before applying anywhere but a local cluster.
+
+```bash
+docker build -t kip:latest .
+# load the locally-built image into your cluster — exact command depends on the tool:
+kind load docker-image kip:latest --name <cluster-name>        # kind
+minikube image load kip:latest                                  # minikube
+
+# fill in real values in k8s/secret.yaml before applying anywhere but a local cluster
+kubectl apply -f k8s/
+kubectl get pods -n kip
+```
+
+No image registry is used — the image is built locally and loaded directly into the cluster (`imagePullPolicy: IfNotPresent`), consistent with this being a demo/local deployment rather than a managed one. On a cluster without the NVIDIA device plugin, the `api`, `worker`, and `ollama` Pods stay `Pending` (`Insufficient nvidia.com/gpu`) — expected, not a bug; every other component (`postgres`, `rabbitmq`, `redis`, `minio`, `elasticsearch`, `tempo`, `prometheus`, `grafana`) still reaches `Running`.
 
 ## API documentation
 
@@ -124,6 +160,10 @@ Unit tests (service layer, against in-memory fake repositories) and integration 
 - No log aggregation (Loki) — logs are JSON on stdout, viewable via `docker compose logs` or the running process's terminal.
 - No alerting rules configured in Prometheus or Grafana.
 - Sentry performance monitoring/profiling is disabled — error capture only.
+- `docker-compose.yml` still only brings up infrastructure dependencies — the API and worker are not yet wired into it as services; the host-based `uv run` workflow above is the only way to run the app itself outside Kubernetes.
+- Kubernetes manifests assume a cluster with the NVIDIA device plugin for GPU scheduling. They validate cleanly against the real Kubernetes 1.29 API schema and have no dangling Secret/ConfigMap references, but have not been applied to a live cluster — minikube and kind both failed to bring up a healthy kubelet in this development sandbox (a nested-container/cgroup limitation of that environment, unrelated to the manifests), so a `kubectl apply -f k8s/` smoke test on a real local or managed cluster is still outstanding.
+- No image registry/push automation — building and loading the image into a cluster is a manual step.
+- No CI pipeline yet — lint, type-check, and tests all run locally.
 
 ## License
 
