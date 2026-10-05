@@ -24,7 +24,7 @@ _embedding_provider = (
     if os.environ.get("EMBEDDING_PROVIDER", "local") == "openai"
     else LocalEmbeddingProvider(device=os.environ.get("EMBEDDING_DEVICE", "cpu"))
 )
-_reranker = CrossEncoderReranker()
+_reranker = CrossEncoderReranker(device=os.environ.get("RERANKER_DEVICE", "cpu"))
 
 
 def get_search_handler(session: AsyncSession = Depends(get_db)) -> RerankingSearchQueryHandler:

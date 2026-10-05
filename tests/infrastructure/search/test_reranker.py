@@ -10,6 +10,12 @@ def test_reranker_defaults_to_cpu() -> None:
         mock_cls.assert_called_once_with("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cpu")
 
 
+def test_reranker_forwards_an_explicit_device() -> None:
+    with patch("infrastructure.search.reranker.CrossEncoder") as mock_cls:
+        CrossEncoderReranker(device="cuda")
+        mock_cls.assert_called_once_with("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cuda")
+
+
 def test_rerank_orders_relevant_text_above_irrelevant_text() -> None:
     reranker = CrossEncoderReranker()
     results = [

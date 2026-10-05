@@ -6,11 +6,11 @@ _MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 
 
 class CrossEncoderReranker:
-    def __init__(self) -> None:
+    def __init__(self, *, device: str = "cpu") -> None:
         # No GPU/fork-safety concern here (unlike LocalEmbeddingProvider): this model is
         # constructed inside the FastAPI process, which never forks per-request. CPU is
         # just the simplest, most portable default, not a correctness requirement.
-        self._model = CrossEncoder(_MODEL_NAME, device="cpu")
+        self._model = CrossEncoder(_MODEL_NAME, device=device)
 
     def rerank(self, *, query: str, results: list[SearchResult], limit: int) -> list[SearchResult]:
         if not results:
