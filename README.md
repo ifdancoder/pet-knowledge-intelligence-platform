@@ -48,13 +48,25 @@ Hexagonal/Clean Architecture, organized by layer with feature sub-packages neste
 - `src/shared/` — small cross-cutting utilities used by multiple layers (ULID generation).
 - `alembic/` — database migrations.
 - `tests/` — pytest suite, mirrors the `src/` layer structure (`tests/domain/`, `tests/application/`, `tests/infrastructure/`, `tests/presentation/`).
+- `.github/workflows/` — CI (lint + test on every push/PR to `main`).
 
 ## How to run
+
+**Full stack, including the API and worker:**
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+The API is now at `http://localhost:8001` (shifted from the container's internal `8000` to avoid colliding with other local projects, same reasoning as Postgres's `5434`/Redis's `6380` below). Requires `nvidia-container-toolkit` on the host for GPU-accelerated embeddings/reranking — see "GPU support" below. On a host without a GPU, remove the `deploy.resources.reservations.devices` block from the `api`, `worker`, and `ollama` services in `docker-compose.yml` and set `EMBEDDING_DEVICE`/`RERANKER_DEVICE` to `cpu`.
+
+**Host-based dev workflow** (faster iteration — `--reload`, no image rebuild per change):
 
 ```bash
 uv sync --all-groups
 cp .env.example .env
-docker compose up -d
+docker compose up -d postgres rabbitmq redis minio elasticsearch ollama tempo prometheus grafana
 export $(cat .env | xargs)
 uv run alembic upgrade head
 uv run uvicorn main:app --reload --app-dir src
@@ -140,10 +152,18 @@ uv run alembic upgrade head
 ## Tests
 
 ```bash
-uv run pytest -v
+uv run pytest -v                        # everything
+uv run pytest -v -m "not integration"   # fast inner loop, no Docker needed
+uv run pytest -v -m integration         # just the Testcontainers-backed tests
 ```
 
 Unit tests (service layer, against in-memory fake repositories) and integration tests (repositories and full API flows, against real Postgres, Elasticsearch, MinIO, and Redis containers via Testcontainers) live side by side under `tests/`, mirroring the `src/` layer structure. The ingestion pipeline additionally has an orchestration test against fakes (`tests/presentation/tasks/test_ingestion.py`) and a full end-to-end test against real infrastructure (`tests/presentation/tasks/test_ingestion_integration.py`); Search has the equivalent end-to-end test against the real pipeline output (`tests/presentation/api/search/test_search_integration.py`); Conversations/RAG has the equivalent against real Postgres and Elasticsearch, with the LLM always faked (`tests/presentation/api/conversations/test_rag_integration.py`). Observability has its own focused tests: Redis-backed rate limiting against a real Redis (Testcontainers), JSON log formatting and trace-context injection, tracing (via OpenTelemetry's `InMemorySpanExporter`, no real Tempo needed), the custom Prometheus histograms, and Sentry capture behavior (mocked, never a real network call).
+
+Tests that need real infrastructure (Postgres, Elasticsearch, MinIO, Redis, via Testcontainers) are marked `@pytest.mark.integration` (124 fast / 50 integration, of 174 total); everything else needs no Docker at all.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`: a `lint` job (Ruff, mypy strict) and a `test` job (the full suite, including the Testcontainers-backed tests — GitHub-hosted runners already have Docker). No Docker image is built or pushed in CI; that stays a manual step.
 
 ## Limitations
 
@@ -160,10 +180,9 @@ Unit tests (service layer, against in-memory fake repositories) and integration 
 - No log aggregation (Loki) — logs are JSON on stdout, viewable via `docker compose logs` or the running process's terminal.
 - No alerting rules configured in Prometheus or Grafana.
 - Sentry performance monitoring/profiling is disabled — error capture only.
-- `docker-compose.yml` still only brings up infrastructure dependencies — the API and worker are not yet wired into it as services; the host-based `uv run` workflow above is the only way to run the app itself outside Kubernetes.
 - Kubernetes manifests assume a cluster with the NVIDIA device plugin for GPU scheduling. They validate cleanly against the real Kubernetes 1.29 API schema and have no dangling Secret/ConfigMap references, but have not been applied to a live cluster — minikube and kind both failed to bring up a healthy kubelet in this development sandbox (a nested-container/cgroup limitation of that environment, unrelated to the manifests), so a `kubectl apply -f k8s/` smoke test on a real local or managed cluster is still outstanding.
 - No image registry/push automation — building and loading the image into a cluster is a manual step.
-- No CI pipeline yet — lint, type-check, and tests all run locally.
+- The GitHub Actions workflow is written and YAML-validated but unverified end-to-end — this repo has no remote configured, so it has never actually run; it will the first time this is pushed to GitHub.
 
 ## License
 
