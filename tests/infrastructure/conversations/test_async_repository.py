@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.conversations.entities import Conversation, Message
@@ -6,6 +7,7 @@ from infrastructure.conversations.async_repository import (
     SqlAlchemyAsyncMessageRepository,
 )
 
+pytestmark = pytest.mark.integration
 
 async def test_conversation_repository_add_get_and_list(db_session: AsyncSession) -> None:
     repo = SqlAlchemyAsyncConversationRepository(db_session)

@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy.orm import Session
 
 from domain.ingestion.entities import Chunk, Document, Source
@@ -7,6 +8,7 @@ from infrastructure.ingestion.repository import (
     SqlAlchemySourceRepository,
 )
 
+pytestmark = pytest.mark.integration
 
 def test_source_repository_add_get_update(sync_db_session: Session) -> None:
     repo = SqlAlchemySourceRepository(sync_db_session)

@@ -1,7 +1,9 @@
 import logging
 
+import pytest
 from httpx import AsyncClient
 
+pytestmark = pytest.mark.integration
 
 def _extract_verification_token(caplog: logging.LogCaptureFixture, email: str) -> str:
     for record in caplog.records:

@@ -25,6 +25,7 @@ from infrastructure.ingestion.models import ChunkModel, DocumentModel, SourceMod
 from infrastructure.ingestion.search_index import ElasticsearchIndexer
 from infrastructure.search.vector_search import PgVectorSearchRepository
 
+pytestmark = pytest.mark.integration
 
 class FakeReranker:
     """Not CrossEncoderReranker — reranking is already proven in the Search sub-project;

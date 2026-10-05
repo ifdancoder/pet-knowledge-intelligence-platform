@@ -1,6 +1,8 @@
+import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+pytestmark = pytest.mark.integration
 
 async def test_can_query_postgres(db_session: AsyncSession) -> None:
     result = await db_session.execute(text("SELECT 1"))

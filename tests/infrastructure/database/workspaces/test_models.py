@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from infrastructure.database.auth.models import UserModel
 from infrastructure.database.workspaces.models import WorkspaceMemberModel, WorkspaceModel
 
+pytestmark = pytest.mark.integration
 
 async def test_workspace_member_composite_key_is_unique(db_session: AsyncSession) -> None:
     user = UserModel(id="u1", email="owner@example.com", hashed_password="x", is_active=True)

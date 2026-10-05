@@ -12,6 +12,7 @@ from infrastructure.ratelimit.redis_limiter import RedisRateLimiter
 from main import create_app
 from presentation.api.auth.dependencies import get_rate_limiter
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def redis_container() -> Iterator[RedisContainer]:

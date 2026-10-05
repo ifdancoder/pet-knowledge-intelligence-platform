@@ -1,5 +1,7 @@
+import pytest
 from httpx import AsyncClient
 
+pytestmark = pytest.mark.integration
 
 async def test_metrics_endpoint_exposes_http_request_series(client: AsyncClient) -> None:
     await client.get("/health")

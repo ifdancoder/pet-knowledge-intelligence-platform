@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.ingestion.models import ChunkModel, DocumentModel, SourceModel
 
+pytestmark = pytest.mark.integration
 
 async def _register_and_verify(client: AsyncClient, email: str, caplog: logging.LogCaptureFixture) -> str:
     with caplog.at_level(logging.INFO):

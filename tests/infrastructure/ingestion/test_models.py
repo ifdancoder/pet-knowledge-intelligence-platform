@@ -1,8 +1,10 @@
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from infrastructure.ingestion.models import ChunkModel, DocumentModel, SourceModel
 
+pytestmark = pytest.mark.integration
 
 def test_source_model_round_trip(sync_db_session: Session) -> None:
     source = SourceModel(

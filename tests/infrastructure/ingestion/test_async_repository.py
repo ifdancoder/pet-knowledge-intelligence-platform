@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.ingestion.entities import Source
@@ -7,6 +8,7 @@ from infrastructure.ingestion.async_repository import (
 )
 from infrastructure.ingestion.models import ChunkModel, DocumentModel, SourceModel
 
+pytestmark = pytest.mark.integration
 
 async def test_async_source_repository_add_and_get(db_session: AsyncSession) -> None:
     repo = SqlAlchemyAsyncSourceRepository(db_session)

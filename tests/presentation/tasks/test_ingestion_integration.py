@@ -22,6 +22,7 @@ from infrastructure.ingestion.source_loaders.registry import SourceLoaderRegistr
 from infrastructure.ingestion.storage import S3Storage
 from worker import app
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def pg_container() -> Iterator[PostgresContainer]:

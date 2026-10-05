@@ -1,5 +1,6 @@
 import datetime
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.auth.entities import EmailVerificationToken, RefreshToken, User
@@ -8,6 +9,8 @@ from infrastructure.database.auth.repository import (
     SqlAlchemyRefreshTokenRepository,
     SqlAlchemyUserRepository,
 )
+
+pytestmark = pytest.mark.integration
 
 NOW = datetime.datetime.now(datetime.UTC)
 FUTURE = NOW + datetime.timedelta(hours=1)

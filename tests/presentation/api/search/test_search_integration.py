@@ -27,6 +27,7 @@ from infrastructure.search.reranker import CrossEncoderReranker
 from infrastructure.search.vector_search import PgVectorSearchRepository
 from worker import app
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def pg_container() -> Iterator[PostgresContainer]:

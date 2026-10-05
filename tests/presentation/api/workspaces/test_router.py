@@ -1,7 +1,9 @@
 import logging
 
+import pytest
 from httpx import AsyncClient
 
+pytestmark = pytest.mark.integration
 
 async def _register_and_verify(client: AsyncClient, email: str, caplog: logging.LogCaptureFixture) -> str:
     with caplog.at_level(logging.INFO):

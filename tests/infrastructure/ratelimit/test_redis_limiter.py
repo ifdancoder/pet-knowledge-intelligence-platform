@@ -8,6 +8,7 @@ from testcontainers.redis import RedisContainer
 
 from infrastructure.ratelimit.redis_limiter import RedisRateLimiter
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def redis_container() -> Iterator[RedisContainer]:

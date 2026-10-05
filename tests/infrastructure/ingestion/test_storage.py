@@ -5,6 +5,7 @@ from testcontainers.minio import MinioContainer
 
 from infrastructure.ingestion.storage import S3Storage
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def minio_container() -> Iterator[MinioContainer]:

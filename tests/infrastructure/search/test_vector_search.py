@@ -1,8 +1,10 @@
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.ingestion.models import ChunkModel, DocumentModel, SourceModel
 from infrastructure.search.vector_search import PgVectorSearchRepository
 
+pytestmark = pytest.mark.integration
 
 async def _seed(db_session: AsyncSession, source_id: str, source_type: str, chunk_id: str, embedding: list[float]) -> None:
     # Flushed separately — SQLAlchemy's automatic FK-dependency insert ordering does not

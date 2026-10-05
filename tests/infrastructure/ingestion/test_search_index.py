@@ -6,6 +6,7 @@ from testcontainers.elasticsearch import ElasticSearchContainer
 from domain.ingestion.entities import Chunk
 from infrastructure.ingestion.search_index import ElasticsearchIndexer
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def es_container() -> Iterator[ElasticSearchContainer]:

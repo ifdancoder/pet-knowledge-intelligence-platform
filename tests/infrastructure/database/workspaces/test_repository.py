@@ -1,9 +1,11 @@
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.workspaces.entities import Role, Workspace
 from infrastructure.database.auth.models import UserModel
 from infrastructure.database.workspaces.repository import SqlAlchemyWorkspaceRepository
 
+pytestmark = pytest.mark.integration
 
 async def _make_user(db_session: AsyncSession, user_id: str, email: str) -> None:
     db_session.add(UserModel(id=user_id, email=email, hashed_password="x", is_active=True))

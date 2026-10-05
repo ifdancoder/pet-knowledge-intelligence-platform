@@ -1,8 +1,10 @@
+import pytest
 from httpx import AsyncClient
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+pytestmark = pytest.mark.integration
 
 async def test_a_request_produces_a_span(client: AsyncClient) -> None:
     exporter = InMemorySpanExporter()

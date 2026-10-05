@@ -6,6 +6,7 @@ from testcontainers.redis import RedisContainer
 
 from infrastructure.ingestion.locking import source_lock
 
+pytestmark = pytest.mark.integration
 
 @pytest.fixture(scope="module")
 def redis_container() -> Iterator[RedisContainer]:
