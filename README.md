@@ -111,7 +111,9 @@ sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
 ```
 
-Verify it worked: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` should print your GPU. In Kubernetes, GPU scheduling additionally requires the cluster to have the NVIDIA device plugin installed — without it, the `api`, `worker`, and `ollama` Pods (each requesting `nvidia.com/gpu: 1`) stay `Pending` with an `Insufficient nvidia.com/gpu` event. `EMBEDDING_DEVICE=cuda` requires the worker to run with Celery's `--pool=solo` (not the default prefork pool), since torch forbids re-initializing CUDA inside a forked process — the `worker` Deployment in `k8s/worker.yaml` already overrides the command for this reason.
+Verify it worked: `docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi` should print your GPU. In Kubernetes, GPU scheduling additionally requires the cluster to have the NVIDIA device plugin installed — `minikube start --gpus=all` installs and configures this automatically; without it, the `api`, `worker`, and `ollama` Pods (each requesting `nvidia.com/gpu: 1`) stay `Pending` with an `Insufficient nvidia.com/gpu` event. `EMBEDDING_DEVICE=cuda` requires the worker to run with Celery's `--pool=solo` (not the default prefork pool), since torch forbids re-initializing CUDA inside a forked process — the `worker` Deployment in `k8s/worker.yaml` already overrides the command for this reason.
+
+**On a single-GPU machine**, the device plugin advertises exactly one `nvidia.com/gpu`, and Kubernetes treats it as an exclusive, non-shareable unit — unlike `docker run --gpus all`, which lets any number of containers share one physical GPU freely. So `api`, `worker`, and `ollama` (each requesting one GPU) can't all run simultaneously on a one-GPU node: whichever two lose the scheduling race stay `Pending` with `Insufficient nvidia.com/gpu`, and that's correct behavior, not a bug. Verified directly: scaling one Deployment to `0` frees the GPU and the next pending Pod schedules onto it within seconds.
 
 ## Kubernetes
 
@@ -128,7 +130,9 @@ kubectl apply -f k8s/
 kubectl get pods -n kip
 ```
 
-No image registry is used — the image is built locally and loaded directly into the cluster (`imagePullPolicy: IfNotPresent`), consistent with this being a demo/local deployment rather than a managed one. On a cluster without the NVIDIA device plugin, the `api`, `worker`, and `ollama` Pods stay `Pending` (`Insufficient nvidia.com/gpu`) — expected, not a bug; every other component (`postgres`, `rabbitmq`, `redis`, `minio`, `elasticsearch`, `tempo`, `prometheus`, `grafana`) still reaches `Running`.
+No image registry is used — the `api`/`worker` image is built locally and loaded directly into the cluster (`imagePullPolicy: IfNotPresent`), consistent with this being a demo/local deployment rather than a managed one.
+
+**Verified live** on a local `minikube --driver=docker --gpus=all` cluster: `kubectl apply -f k8s/` brings up every resource in the `kip` namespace, all nine infrastructure Pods (`postgres`, `rabbitmq`, `redis`, `minio`, `elasticsearch`, `ollama`, `tempo`, `prometheus`, `grafana`) reach `Running`, and (after freeing the node's single GPU, per the note above) `api` itself reaches `Running`, passes `torch.cuda.is_available() == True` inside the Pod, and answers `GET /health` with `{"status":"ok"}` over a `kubectl port-forward`. This caught one real bug since fixed: `minio.yaml` used `command:` to pass MinIO's CLI flags, but in Kubernetes (unlike Docker Compose) `command:` replaces the image's *entrypoint*, not just its default arguments — it needed `args:` instead, to keep the image's own `minio` entrypoint and just supply `server /data --console-address :9091` to it.
 
 ## API documentation
 
@@ -180,7 +184,8 @@ Tests that need real infrastructure (Postgres, Elasticsearch, MinIO, Redis, via 
 - No log aggregation (Loki) — logs are JSON on stdout, viewable via `docker compose logs` or the running process's terminal.
 - No alerting rules configured in Prometheus or Grafana.
 - Sentry performance monitoring/profiling is disabled — error capture only.
-- Kubernetes manifests assume a cluster with the NVIDIA device plugin for GPU scheduling. They validate cleanly against the real Kubernetes 1.29 API schema and have no dangling Secret/ConfigMap references, but have not been applied to a live cluster — minikube and kind both failed to bring up a healthy kubelet in this development sandbox (a nested-container/cgroup limitation of that environment, unrelated to the manifests), so a `kubectl apply -f k8s/` smoke test on a real local or managed cluster is still outstanding.
+- On a single-GPU machine, only one of `api`/`worker`/`ollama` can hold the node's one `nvidia.com/gpu` at a time; the other two stay `Pending` until it's freed (see "GPU support"). Not an issue on a multi-GPU or CPU-only (`EMBEDDING_DEVICE=cpu`) deployment.
+- Kubernetes manifests have not been tested against a real managed cluster (EKS/GKE/AKS), only a local `minikube` cluster.
 - No image registry/push automation — building and loading the image into a cluster is a manual step.
 - The GitHub Actions workflow is written and YAML-validated but unverified end-to-end — this repo has no remote configured, so it has never actually run; it will the first time this is pushed to GitHub.
 
