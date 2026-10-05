@@ -17,7 +17,10 @@ spec:
       containers:
         - name: minio
           image: minio/minio
-          command: ["server", "/data", "--console-address", ":9091"]
+          # `command:` in Kubernetes replaces the image's ENTRYPOINT (unlike Docker
+          # Compose's `command:`, which only replaces CMD) — `args:` is the equivalent
+          # of Compose's `command:` here, keeping the image's own `minio` entrypoint.
+          args: ["server", "/data", "--console-address", ":9091"]
           ports:
             - containerPort: 9000
             - containerPort: 9091
