@@ -9,6 +9,11 @@ services:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kip"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - default
 
@@ -20,6 +25,11 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: kip
       RABBITMQ_DEFAULT_PASS: kip
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - default
 
@@ -27,6 +37,11 @@ services:
     image: redis:7
     ports:
       - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - default
 
@@ -61,6 +76,13 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - default
 
@@ -94,6 +116,85 @@ services:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning
     ports:
       - "3000:3000"
+    networks:
+      - default
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kip:kip@postgres:5432/kip
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      RABBITMQ_URL: amqp://kip:kip@rabbitmq:5672//
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: kip
+      S3_SECRET_KEY: kipkipkip
+      S3_BUCKET: sources
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      EMBEDDING_PROVIDER: local
+      EMBEDDING_DEVICE: cuda
+      RERANKER_DEVICE: cuda
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: local
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: llama3.2:1b
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: claude-sonnet-5
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      METRICS_PORT: "9001"
+    ports:
+      - "8001:8000"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - default
+
+  worker:
+    build: .
+    command: celery -A worker worker --pool=solo --loglevel=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kip:kip@postgres:5432/kip
+      SYNC_DATABASE_URL: postgresql+psycopg2://kip:kip@postgres:5432/kip
+      JWT_SECRET: ${JWT_SECRET:-local-dev-secret}
+      RABBITMQ_URL: amqp://kip:kip@rabbitmq:5672//
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: kip
+      S3_SECRET_KEY: kipkipkip
+      S3_BUCKET: sources
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      EMBEDDING_PROVIDER: local
+      EMBEDDING_DEVICE: cuda
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4317
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      METRICS_PORT: "9001"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - default
 
