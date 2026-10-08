@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: 17 17 23;
+  --color-surface: 26 26 36;
+  --color-border: 45 45 58;
+  --color-text-primary: 237 237 240;
+  --color-text-secondary: 161 161 175;
+  --color-accent: 129 140 248;
+}
+
+body {
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-text-primary));
+}
