@@ -1,7 +1,10 @@
 from application.ingestion.command_handlers import UploadSourceCommandHandler
 from application.ingestion.commands import UploadSourceCommand
-from application.ingestion.queries import GetSourceStatusQuery
-from application.ingestion.query_handlers import GetSourceStatusQueryHandler
+from application.ingestion.queries import GetSourceStatusQuery, ListSourcesByWorkspaceQuery
+from application.ingestion.query_handlers import (
+    GetSourceStatusQueryHandler,
+    ListSourcesByWorkspaceQueryHandler,
+)
 from domain.ingestion.entities import Source
 
 
@@ -14,6 +17,9 @@ class FakeAsyncSourceRepository:
 
     async def get_by_id(self, source_id: str) -> Source | None:
         return self.sources_by_id.get(source_id)
+
+    async def list_by_workspace_id(self, workspace_id: str) -> list[Source]:
+        return [s for s in self.sources_by_id.values() if s.workspace_id == workspace_id]
 
 
 class FakeStorage:
@@ -41,3 +47,21 @@ async def test_get_source_status_returns_the_source() -> None:
     assert fetched is not None
     assert fetched.id == source_id
     assert await query_handler.handle(GetSourceStatusQuery("missing")) is None
+
+
+async def test_list_sources_by_workspace_returns_only_that_workspaces_sources() -> None:
+    sources = FakeAsyncSourceRepository()
+    storage = FakeStorage()
+    upload_handler = UploadSourceCommandHandler(sources, storage)
+    query_handler = ListSourcesByWorkspaceQueryHandler(sources)
+    await upload_handler.handle(
+        UploadSourceCommand(workspace_id="w1", type="markdown", filename="a.md", file_bytes=b"a")
+    )
+    await upload_handler.handle(
+        UploadSourceCommand(workspace_id="w2", type="markdown", filename="b.md", file_bytes=b"b")
+    )
+
+    result = await query_handler.handle(ListSourcesByWorkspaceQuery(workspace_id="w1"))
+
+    assert len(result) == 1
+    assert result[0].workspace_id == "w1"

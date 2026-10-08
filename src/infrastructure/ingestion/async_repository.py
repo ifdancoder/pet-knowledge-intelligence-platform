@@ -35,6 +35,22 @@ class SqlAlchemyAsyncSourceRepository:
             error=model.error,
         )
 
+    async def list_by_workspace_id(self, workspace_id: str) -> list[Source]:
+        result = await self._session.execute(
+            select(SourceModel).where(SourceModel.workspace_id == workspace_id).order_by(SourceModel.id)
+        )
+        return [
+            Source(
+                id=model.id,
+                workspace_id=model.workspace_id,
+                type=model.type,
+                storage_key=model.storage_key,
+                status=model.status,
+                error=model.error,
+            )
+            for model in result.scalars().all()
+        ]
+
 
 class SqlAlchemyAsyncChunkRepository:
     def __init__(self, session: AsyncSession) -> None:

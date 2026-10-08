@@ -82,3 +82,34 @@ async def test_get_status_rejects_unknown_source(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "source_not_found"
+
+
+async def test_list_sources_returns_only_that_workspaces_sources(
+    client: AsyncClient, caplog: logging.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import presentation.api.sources.router as sources_router
+
+    monkeypatch.setattr(sources_router.extract_document, "delay", MagicMock())
+    monkeypatch.setattr(sources_router, "_storage", MagicMock(upload=MagicMock()))
+
+    await _register_and_verify(client, "lister2@example.com", caplog)
+    owner_token = await _login(client, "lister2@example.com")
+    create_response = await client.post(
+        "/api/v1/workspaces", json={"name": "Acme"}, headers=_auth_header(owner_token)
+    )
+    workspace_id = create_response.json()["id"]
+
+    await client.post(
+        f"/api/v1/workspaces/{workspace_id}/sources",
+        files={"file": ("notes.md", b"# hello", "text/markdown")},
+        headers=_auth_header(owner_token),
+    )
+
+    response = await client.get(
+        f"/api/v1/workspaces/{workspace_id}/sources", headers=_auth_header(owner_token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["status"] == "queued"

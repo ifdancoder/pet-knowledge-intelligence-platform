@@ -20,6 +20,17 @@ async def test_async_source_repository_add_and_get(db_session: AsyncSession) -> 
     assert await repo.get_by_id("missing") is None
 
 
+async def test_list_by_workspace_id_returns_only_that_workspaces_sources(db_session: AsyncSession) -> None:
+    repo = SqlAlchemyAsyncSourceRepository(db_session)
+    await repo.add(Source.create(workspace_id="w1", type="pdf", storage_key="w1/a.pdf"))
+    await repo.add(Source.create(workspace_id="w2", type="pdf", storage_key="w2/b.pdf"))
+
+    result = await repo.list_by_workspace_id("w1")
+
+    assert len(result) == 1
+    assert result[0].workspace_id == "w1"
+
+
 async def test_async_chunk_repository_get_by_ids(db_session: AsyncSession) -> None:
     db_session.add(SourceModel(id="s1", workspace_id="w1", type="markdown", storage_key="w1/a.md"))
     await db_session.flush()

@@ -5,8 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from application.ingestion.command_handlers import UploadSourceCommandHandler
 from application.ingestion.commands import UploadSourceCommand
-from application.ingestion.queries import GetSourceStatusQuery
-from application.ingestion.query_handlers import GetSourceStatusQueryHandler
+from application.ingestion.queries import GetSourceStatusQuery, ListSourcesByWorkspaceQuery
+from application.ingestion.query_handlers import (
+    GetSourceStatusQueryHandler,
+    ListSourcesByWorkspaceQueryHandler,
+)
 from domain.ingestion.exceptions import SourceNotFoundError
 from domain.workspaces.entities import Permission, Role
 from infrastructure.database.session import get_db
@@ -36,6 +39,12 @@ def get_status_handler(session: AsyncSession = Depends(get_db)) -> GetSourceStat
     return GetSourceStatusQueryHandler(SqlAlchemyAsyncSourceRepository(session))
 
 
+def get_list_sources_handler(
+    session: AsyncSession = Depends(get_db),
+) -> ListSourcesByWorkspaceQueryHandler:
+    return ListSourcesByWorkspaceQueryHandler(SqlAlchemyAsyncSourceRepository(session))
+
+
 @router.post("", response_model=SourceResponse, status_code=201)
 async def upload_source(
     workspace_id: str,
@@ -57,6 +66,16 @@ async def upload_source(
     )
     extract_document.delay(source_id)
     return SourceResponse(source_id=source_id, status="queued", error=None)
+
+
+@router.get("", response_model=list[SourceResponse])
+async def list_sources(
+    workspace_id: str,
+    _role: Role = Depends(require_permission(Permission.VIEW_WORKSPACE)),
+    handler: ListSourcesByWorkspaceQueryHandler = Depends(get_list_sources_handler),
+) -> list[SourceResponse]:
+    sources = await handler.handle(ListSourcesByWorkspaceQuery(workspace_id=workspace_id))
+    return [SourceResponse(source_id=s.id, status=s.status, error=s.error) for s in sources]
 
 
 @router.get("/{source_id}", response_model=SourceResponse)
