@@ -7,6 +7,7 @@ import { RegisterPage } from '../auth/RegisterPage'
 import { WorkspacePickerPage } from '../workspaces/WorkspacePickerPage'
 import { SourcesPage } from '../sources/SourcesPage'
 import { SearchPage } from '../search/SearchPage'
+import { ChatPage } from '../conversations/ChatPage'
 import { ToastProvider } from '../shared/ui/Toast'
 
 function SessionExpiryListener() {
@@ -33,6 +34,8 @@ export function App() {
               <Route path="/workspaces" element={<WorkspacePickerPage />} />
               <Route path="/w/:workspaceId" element={<SourcesPage />} />
               <Route path="/w/:workspaceId/search" element={<SearchPage />} />
+              <Route path="/w/:workspaceId/chat" element={<ChatPage />} />
+              <Route path="/w/:workspaceId/chat/:conversationId" element={<ChatPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
