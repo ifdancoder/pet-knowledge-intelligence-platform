@@ -4,12 +4,7 @@ from contextlib import asynccontextmanager
 
 from infrastructure.observability.bootstrap import configure_observability
 
-# Called before any other project import: presentation.api.sources.router
-# transitively imports worker.py (for its own configure_observability() call,
-# service_name="kip-worker"), and OpenTelemetry's set_tracer_provider() only
-# takes effect on its first call per process — whichever call runs first wins
-# permanently. Importing anything else first would silently mislabel every
-# span this process produces as "kip-worker" instead of "kip-api".
+# Configure tracing before imports that transitively load the Celery worker.
 configure_observability(service_name="kip-api")
 
 from fastapi import FastAPI

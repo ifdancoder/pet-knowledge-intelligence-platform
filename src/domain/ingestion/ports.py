@@ -4,8 +4,6 @@ from domain.ingestion.entities import Chunk, Document, Source
 
 
 class SourceRepository(Protocol):
-    """Sync — used by Celery pipeline stage services."""
-
     def add(self, source: Source) -> None: ...
     def get_by_id(self, source_id: str) -> Source | None: ...
     def update(self, source: Source) -> None: ...
@@ -24,8 +22,6 @@ class ChunkRepository(Protocol):
 
 
 class SourceLoader(Protocol):
-    """The one async port — bridged by a single asyncio.run() in ExtractDocumentService."""
-
     async def load(self, source: Source, file_bytes: bytes) -> str: ...
 
 
@@ -40,21 +36,15 @@ class SearchIndexer(Protocol):
 
 
 class Storage(Protocol):
-    """Sync. Celery calls it directly; the async API bridges via run_in_threadpool."""
-
     def upload(self, key: str, data: bytes) -> None: ...
     def download(self, key: str) -> bytes: ...
 
 
 class AsyncSourceRepository(Protocol):
-    """Async — used only by the API's upload/status endpoints."""
-
     async def add(self, source: Source) -> None: ...
     async def get_by_id(self, source_id: str) -> Source | None: ...
     async def list_by_workspace_id(self, workspace_id: str) -> list[Source]: ...
 
 
 class AsyncChunkRepository(Protocol):
-    """Async — used only by Search's read path, mirrors AsyncSourceRepository."""
-
     async def get_by_ids(self, chunk_ids: list[str]) -> list[Chunk]: ...

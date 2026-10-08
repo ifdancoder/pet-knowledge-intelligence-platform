@@ -58,11 +58,6 @@ class HybridSearchQueryHandler:
 
 
 class RerankingSearchQueryHandler:
-    """Decorator — wraps any handler with the same handle(query) -> list[SearchResult]
-    shape and reranks its output. HybridSearchQueryHandler never applies query.limit
-    itself (it returns the whole candidate pool); this is the one place limit is enforced,
-    after reranking has had the full pool to work with."""
-
     def __init__(self, inner: HybridSearchQueryHandler, reranker: Reranker) -> None:
         self._inner = inner
         self._reranker = reranker

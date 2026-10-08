@@ -20,8 +20,6 @@ def test_a_chunk_ranked_first_in_both_lists_wins() -> None:
 
 
 def test_ignores_the_input_lists_own_scores_only_rank_matters() -> None:
-    # "b" is ranked #1 in vector_hits despite a tiny raw score — RRF must still favor it
-    # over "a", which is ranked #2 in both lists, proving fusion uses rank, not magnitude.
     keyword_hits = [{"chunk_id": "a", "score": 9.1}, {"chunk_id": "x", "score": 8.0}]
     vector_hits = [{"chunk_id": "b", "score": 0.001}, {"chunk_id": "a", "score": 0.95}]
 

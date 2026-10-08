@@ -38,11 +38,7 @@ _task_start_times: dict[str, float] = {}
 
 @worker_ready.connect
 def _start_metrics_server(sender: object = None, **kwargs: object) -> None:
-    # worker_ready only fires inside an actual running `celery worker` process,
-    # never when this module is merely imported (e.g. by the API, which imports
-    # `worker.app` transitively via presentation/tasks/ingestion.py to call
-    # .delay()) — importing must never bind a port, only actually running as a
-    # worker should.
+    # Do not bind the metrics port when this module is imported by the API.
     start_http_server(int(os.environ.get("METRICS_PORT", "9001")))
 
 

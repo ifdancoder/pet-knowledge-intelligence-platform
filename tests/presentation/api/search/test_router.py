@@ -58,8 +58,7 @@ async def test_search_returns_a_chunk_found_by_either_source(
     )
     workspace_id = create_response.json()["id"]
 
-    # Flushed separately — SQLAlchemy's automatic FK-dependency insert ordering does not
-    # reliably apply across mixed-mapper add_all() batches with the asyncpg driver.
+    # Preserve foreign-key insertion order with asyncpg.
     db_session.add(SourceModel(id="s1", workspace_id=workspace_id, type="markdown", storage_key="w/a.md"))
     await db_session.flush()
     db_session.add(DocumentModel(id="d1", source_id="s1", raw_text="irrelevant"))

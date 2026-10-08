@@ -28,17 +28,11 @@ from infrastructure.search.vector_search import PgVectorSearchRepository
 pytestmark = pytest.mark.integration
 
 class FakeReranker:
-    """Not CrossEncoderReranker — reranking is already proven in the Search sub-project;
-    this test only needs the candidates passed through unchanged, in fused order."""
-
     def rerank(self, *, query: str, results: list[SearchResult], limit: int) -> list[SearchResult]:
         return results[:limit]
 
 
 class FakeLLMProvider:
-    """Per the spec's explicit decision: never a real Anthropic/Ollama network call,
-    even in this end-to-end test."""
-
     def __init__(self, reply: str) -> None:
         self._reply = reply
         self.last_system: str = ""
@@ -80,8 +74,6 @@ async def test_full_rag_flow_against_real_postgres_and_elasticsearch(
     llm = FakeLLMProvider("A chunk is a small piece of a larger document.")
 
     async with session_local() as session:
-        # Seed one indexed chunk directly — this test proves the RAG orchestration,
-        # not the ingestion pipeline (Search's own Task 8 already proves that path).
         session.add(SourceModel(id="s1", workspace_id="w1", type="markdown", storage_key="w1/a.md"))
         await session.flush()
         session.add(DocumentModel(id="d1", source_id="s1", raw_text="irrelevant"))
@@ -126,6 +118,6 @@ async def test_full_rag_flow_against_real_postgres_and_elasticsearch(
         history = await messages.list_by_conversation_id(conversation_id)
         assert len(history) == 2
         assert history[1].source_chunk_ids == ["c1"]
-        assert "retrieval" in llm.last_system  # the real retrieved chunk text made it into the prompt
+        assert "retrieval" in llm.last_system
 
     await engine.dispose()

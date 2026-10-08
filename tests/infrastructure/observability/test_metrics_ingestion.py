@@ -1,6 +1,6 @@
 from celery import Celery
 
-import worker  # noqa: F401 — ensures worker.py's Celery signal handlers are connected
+import worker  # noqa: F401
 from infrastructure.observability.metrics import ingestion_stage_duration_seconds
 
 

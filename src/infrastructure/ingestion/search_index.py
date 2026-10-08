@@ -12,13 +12,7 @@ class ElasticsearchIndexer:
         self._index_ensured = False
 
     def _ensure_index(self) -> None:
-        # Deferred to first real use, not the constructor: this adapter is built as a
-        # module-level singleton at import time (presentation/tasks/ingestion.py, Task 15),
-        # and a network call in __init__ would make importing that module fail whenever
-        # Elasticsearch isn't reachable yet — which, transitively, breaks importing the
-        # whole FastAPI app (and therefore the whole test suite) the moment Elasticsearch
-        # is down, even for code paths that never touch search. This directly violates
-        # Task 15's own stated requirement that importing that module must never raise.
+        # Avoid network access while application modules are being imported.
         if self._index_ensured:
             return
         if not self._client.indices.exists(index=self._index_name):

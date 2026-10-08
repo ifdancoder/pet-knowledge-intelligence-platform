@@ -53,7 +53,7 @@ class FakeChunkRepository:
 
 
 class FakeSessionLocal:
-    """Stands in for sessionmaker() — ignores commit/close, repositories share one dict-backed store."""
+    """In-memory session factory used by repository fakes."""
 
     def __init__(self) -> None:
         self.sources: dict[str, Source] = {}

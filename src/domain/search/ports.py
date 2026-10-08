@@ -4,9 +4,6 @@ from domain.search.entities import SearchResult
 
 
 class KeywordSearchPort(Protocol):
-    """Sync — ElasticsearchIndexer's client is sync; the application layer bridges
-    with run_in_threadpool, same pattern as Storage in the ingestion upload path."""
-
     def search(
         self, *, query: str, workspace_id: str, source_type: str | None, limit: int
     ) -> list[dict[str, Any]]: ...

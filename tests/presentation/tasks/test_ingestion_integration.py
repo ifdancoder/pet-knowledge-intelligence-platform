@@ -97,7 +97,7 @@ def test_full_chain_against_real_infrastructure(
     source = Source.create(workspace_id="w1", type="markdown", storage_key="")
     source.storage_key = f"w1/{source.id}-notes.md"
     storage.upload(
-        source.storage_key, b"# Real Infra Test\n\nThis document proves the pipeline works end to end."
+        source.storage_key, b"# Real Infra Test\n\nEnd-to-end pipeline test document."
     )
 
     session = session_local()

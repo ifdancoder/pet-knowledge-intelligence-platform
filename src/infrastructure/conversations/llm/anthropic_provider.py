@@ -11,10 +11,7 @@ class AnthropicLLMProvider:
         self._model = model
 
     async def stream(self, *, system: str, messages: list[dict[str, str]]) -> AsyncIterator[str]:
-        # LLMProvider's Protocol keeps `messages` as plain dicts so every adapter can shape
-        # them for its own SDK — mypy can't verify a dict[str, str] against MessageParam's
-        # Literal["user", "assistant", "system"] role without this cast, but our own
-        # Message.role is always "user"/"assistant" (see domain/conversations/entities.py).
+        # Domain message roles match the roles accepted by MessageParam.
         anthropic_messages = cast(list[MessageParam], messages)
         async with self._client.messages.stream(
             model=self._model, max_tokens=4096, system=system, messages=anthropic_messages

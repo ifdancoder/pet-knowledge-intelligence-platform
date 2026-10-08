@@ -27,9 +27,6 @@ from shared.ids import generate_id
 
 
 class SourceLoaderRegistryProtocol(Protocol):
-    """Narrow structural shape ExtractDocumentCommandHandler depends on, so the application
-    layer does not need to import the concrete infrastructure registry class."""
-
     def get(self, source_type: str) -> SourceLoader: ...
 
 

@@ -18,7 +18,6 @@ def test_chunks_overlap() -> None:
     paragraph = "word " * 50
     text = "\n\n".join([paragraph] * 10)
     chunks = split_into_chunks(text, target_size=1000, overlap=100)
-    # the tail of one chunk reappears at the head of the next
     first_tail = chunks[0][-50:]
     assert first_tail in chunks[1]
 

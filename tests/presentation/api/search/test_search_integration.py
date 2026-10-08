@@ -104,7 +104,7 @@ def test_search_finds_a_chunk_indexed_by_the_real_pipeline(
     source.storage_key = f"w1/{source.id}-notes.md"
     storage.upload(
         source.storage_key,
-        b"# Search Integration Test\n\nThis document proves hybrid search works end to end.",
+        b"# Search Integration Test\n\nEnd-to-end hybrid search test document.",
     )
 
     sync_session = session_local()
@@ -134,10 +134,7 @@ def test_search_finds_a_chunk_indexed_by_the_real_pipeline(
                 SearchQuery(query="hybrid search", workspace_id="w1", source_type=None, limit=5)
             )
 
-    # extract_document.delay(...) above bridges SourceLoader.load via asyncio.run() internally
-    # (ExtractDocumentCommandHandler), so this test function must stay sync — asyncio.run()
-    # cannot be called from within an already-running event loop. The search step is async
-    # (AsyncSession-based), so it gets its own, separate asyncio.run() here instead.
+    # The ingestion handler uses asyncio.run(), so the test remains synchronous.
     results = asyncio.run(run_search())
     asyncio.run(async_engine.dispose())
 

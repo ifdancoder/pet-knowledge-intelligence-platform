@@ -12,4 +12,4 @@ async def test_markdown_loader_returns_the_file_text() -> None:
     text = await loader.load(source, file_bytes)
 
     assert "sample" in text
-    assert "**sample**" in text  # markdown syntax preserved — NormalizeDocument handles it later, not the loader
+    assert "**sample**" in text

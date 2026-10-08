@@ -63,9 +63,7 @@ line-length = 100
 target-version = "py313"
 
 [tool.ruff.lint]
-# B008: FastAPI's Depends()/Header()/Path() in argument defaults is the
-# documented, idiomatic pattern — not the mutable-default-argument bug
-# this rule exists to catch.
+# FastAPI uses Depends()/Header()/Path() in argument defaults.
 ignore = ["B008"]
 
 [tool.mypy]
@@ -78,20 +76,16 @@ module = ["celery.*", "kombu.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# opentelemetry-instrumentation-celery ships no py.typed marker, so its
-# BaseInstrumentor.instrument() is seen as untyped under strict mode no
-# matter how the call site is annotated.
+# opentelemetry-instrumentation-celery has no py.typed marker.
 module = "infrastructure.observability.tracing"
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-# Celery's @app.task has no type stubs, so its decorated functions are
-# untyped under strict mode no matter how the function itself is annotated.
+# Celery's @app.task has no type stubs.
 module = "presentation.tasks.ingestion"
 disallow_untyped_decorators = false
 
 [[tool.mypy.overrides]]
-# Same reasoning as above: celery.signals.task_prerun/task_postrun.connect
-# are untyped decorators.
+# Celery signal decorators have no type stubs.
 module = "worker"
 disallow_untyped_decorators = false

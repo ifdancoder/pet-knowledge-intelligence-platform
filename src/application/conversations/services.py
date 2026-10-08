@@ -15,10 +15,6 @@ _RETRIEVAL_LIMIT = 5
 
 
 class GenerateAssistantReplyService:
-    """Not a Command/QueryHandler: this is a streaming use case, and naming it like
-    the rest would be dishonest about its shape (handle(x) -> AsyncIterator[str] is
-    nothing like the request/response handlers everywhere else)."""
-
     def __init__(
         self,
         conversations: ConversationRepository,

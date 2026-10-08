@@ -142,9 +142,8 @@ async def send_message(
         try:
             async for delta in reply_service.stream(conversation_id=conversation_id, workspace_id=workspace_id):
                 yield f"data: {json.dumps({'delta': delta})}\n\n"
-        except Exception as exc:  # noqa: BLE001 — fail-fast boundary: any failure once
-            # streaming has started (headers are already sent) must become an SSE
-            # error event rather than an unhandled 500, so this is deliberately broad.
+        except Exception as exc:  # noqa: BLE001
+            # Headers have already been sent, so report the failure through SSE.
             rag_generation_duration_seconds.observe(time.monotonic() - start)
             yield f"data: {json.dumps({'error': str(exc)})}\n\n"
             return

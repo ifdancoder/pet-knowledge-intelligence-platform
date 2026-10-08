@@ -7,8 +7,7 @@ from infrastructure.search.vector_search import PgVectorSearchRepository
 pytestmark = pytest.mark.integration
 
 async def _seed(db_session: AsyncSession, source_id: str, source_type: str, chunk_id: str, embedding: list[float]) -> None:
-    # Flushed separately — SQLAlchemy's automatic FK-dependency insert ordering does not
-    # reliably apply across mixed-mapper add_all() batches with the asyncpg driver.
+    # Preserve foreign-key insertion order with asyncpg.
     db_session.add(SourceModel(id=source_id, workspace_id="w1", type=source_type, storage_key=f"w1/{source_id}"))
     await db_session.flush()
     db_session.add(DocumentModel(id=f"doc-{source_id}", source_id=source_id, raw_text="irrelevant"))

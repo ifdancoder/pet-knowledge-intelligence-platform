@@ -47,10 +47,7 @@ async def test_send_message_streams_deltas_and_persists_the_reply(
     fake_llm.stream = fake_stream
     monkeypatch.setattr(conversations_router, "_llm", fake_llm)
 
-    # the service's retrieval step goes through the same module-level search
-    # components as presentation.api.search.router; no real Elasticsearch/embedding
-    # infra is running in this test, so these are faked exactly as search's own
-    # router test fakes them.
+    # Isolate the route from external search services.
     fake_keyword = MagicMock()
     fake_keyword.search.return_value = []
     monkeypatch.setattr(search_router, "_keyword_search", fake_keyword)
@@ -112,9 +109,7 @@ async def test_a_non_owner_cannot_read_another_user_s_conversation(
 
     intruder_id = await _register_and_verify(client, "intruder@example.com", caplog)
     intruder_token = await _login(client, "intruder@example.com")
-    # invite the intruder as a real workspace member so the request reaches
-    # GetConversationMessagesQueryHandler and the assertion exercises the
-    # conversation-ownership check specifically, not workspace membership.
+    # Workspace membership is required before conversation ownership is checked.
     await client.post(
         f"/api/v1/workspaces/{workspace_id}/members",
         json={"user_id": intruder_id, "role": "viewer"},

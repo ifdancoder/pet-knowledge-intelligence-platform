@@ -16,10 +16,7 @@ spec:
     spec:
       containers:
         - name: minio
-          # MinIO deleted minio/minio from Docker Hub (2026-09-11) and then locked down
-          # quay.io/minio/minio to anonymous pulls too. Chainguard mirrors the same
-          # upstream binary with anonymous pulls still open; same entrypoint/args/env
-          # contract as the original image, verified by running it directly.
+          # Public mirror used because upstream images require authentication.
           image: cgr.dev/chainguard/minio:latest
           args: ["server", "/data", "--console-address", ":9091"]
           ports:
