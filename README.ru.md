@@ -83,6 +83,21 @@ API теперь доступен на `http://localhost:8000`.
 PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 ```
 
+## Фронтенд
+
+React SPA в `frontend/` покрывает MVP-сценарий: регистрация, подтверждение почты, вход, выбор или создание воркспейса, загрузка источника с отслеживанием статуса обработки, поиск по нему и чат с ним через стриминговый RAG-эндпоинт.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+Фронтенд теперь доступен на `http://localhost:5173`. API должен быть уже запущен (см. выше) с `FRONTEND_ORIGIN=http://localhost:5173`, чтобы CORS пропускал запросы от dev-сервера.
+
+Тесты запускаются командой `cd frontend && npm test`.
+
 ## Переменные окружения
 
 - `DATABASE_URL`: строка подключения к Postgres, например `postgresql+asyncpg://kip:kip@localhost:5434/kip`
@@ -99,6 +114,7 @@ PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: куда экспортируются трейсы (по умолчанию `http://localhost:4317`, OTLP gRPC порт Tempo). Если недоступен, спаны просто молча отбрасываются, а не ломают запрос
 - `SENTRY_DSN`: опционально; пустое значение означает, что Sentry работает как no-op
 - `METRICS_PORT`: собственный порт сервера метрик Prometheus у Celery-воркера (по умолчанию `9001`), отдельный от `/metrics` у API
+- `FRONTEND_ORIGIN`: origin dev-сервера фронтенда, разрешённый через CORS (по умолчанию `http://localhost:5173`)
 
 ## Поддержка GPU
 

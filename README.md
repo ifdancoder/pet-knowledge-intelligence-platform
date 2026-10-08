@@ -83,6 +83,21 @@ Start the Celery worker (separate process from the API):
 PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 ```
 
+## Frontend
+
+A React SPA in `frontend/` covers the MVP path: register, verify email, log in, pick or create a workspace, upload a source and watch it process, search it, and chat with it over the streaming RAG endpoint.
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+The frontend is now at `http://localhost:5173`. The API must already be running (see above) with `FRONTEND_ORIGIN=http://localhost:5173` set, so its CORS middleware allows requests from the dev server.
+
+Run its tests with `cd frontend && npm test`.
+
 ## Environment variables
 
 - `DATABASE_URL`: Postgres connection string, e.g. `postgresql+asyncpg://kip:kip@localhost:5434/kip`
@@ -99,6 +114,7 @@ PYTHONPATH=src uv run celery -A worker worker --loglevel=info
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: where traces are exported (default `http://localhost:4317`, Tempo's OTLP gRPC port). If unreachable, spans are silently dropped rather than breaking a request
 - `SENTRY_DSN`: optional; unset or empty means Sentry is a no-op
 - `METRICS_PORT`: the Celery worker's own Prometheus metrics server port (default `9001`), separate from the API's `/metrics`
+- `FRONTEND_ORIGIN`: the frontend dev server's origin, allowed through CORS (default `http://localhost:5173`)
 
 ## GPU support
 
