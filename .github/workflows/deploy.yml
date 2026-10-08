@@ -41,6 +41,8 @@ jobs:
             sudo k3s ctr images import /tmp/kip-frontend.tar
             rm /tmp/kip.tar /tmp/kip-frontend.tar
 
+            kubectl apply -f k8s/production/namespace.yaml
+
             kubectl create secret generic kip-secrets -n kip \
               --from-literal=POSTGRES_USER=kip \
               --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
