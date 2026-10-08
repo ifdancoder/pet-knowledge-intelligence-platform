@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: kip
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: kip:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: kip-config}
+          env:
+            - name: JWT_SECRET
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: JWT_SECRET}}
+            - name: S3_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: S3_ACCESS_KEY}}
+            - name: S3_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: S3_SECRET_KEY}}
+            - name: OPENAI_API_KEY
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: OPENAI_API_KEY}}
+            - name: ANTHROPIC_API_KEY
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: ANTHROPIC_API_KEY}}
+            - name: SENTRY_DSN
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: SENTRY_DSN}}
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: DATABASE_URL}}
+            - name: SYNC_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: SYNC_DATABASE_URL}}
+            - name: RABBITMQ_URL
+              valueFrom: {secretKeyRef: {name: kip-secrets, key: RABBITMQ_URL}}
+          resources:
+            requests: {cpu: 100m, memory: 384Mi}
+            limits: {cpu: 1000m, memory: 1536Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: kip
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8000
+      targetPort: 8000
