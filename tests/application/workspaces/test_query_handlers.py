@@ -3,10 +3,15 @@ from application.workspaces.command_handlers import (
     InviteMemberCommandHandler,
 )
 from application.workspaces.commands import CreateWorkspaceCommand, InviteMemberCommand
-from application.workspaces.queries import GetWorkspaceByIdQuery, GetWorkspaceMembersQuery
+from application.workspaces.queries import (
+    GetWorkspaceByIdQuery,
+    GetWorkspaceMembersQuery,
+    GetWorkspacesForUserQuery,
+)
 from application.workspaces.query_handlers import (
     GetWorkspaceByIdQueryHandler,
     GetWorkspaceMembersQueryHandler,
+    GetWorkspacesForUserQueryHandler,
 )
 from domain.workspaces.entities import Role, Workspace
 
@@ -26,6 +31,9 @@ class FakeWorkspaceRepository:
 
     async def delete(self, workspace: Workspace) -> None:
         self.workspaces_by_id.pop(workspace.id, None)
+
+    async def list_by_user_id(self, user_id: str) -> list[Workspace]:
+        return [w for w in self.workspaces_by_id.values() if w.get_member(user_id) is not None]
 
 
 async def test_get_workspace_by_id_returns_the_workspace() -> None:
@@ -60,3 +68,16 @@ async def test_get_workspace_members_returns_all_members() -> None:
     members = await query_handler.handle(GetWorkspaceMembersQuery(workspace_id))
 
     assert {m.user_id for m in members} == {"user-1", "user-2"}
+
+
+async def test_get_workspaces_for_user_returns_only_member_workspaces() -> None:
+    workspaces = FakeWorkspaceRepository()
+    create = CreateWorkspaceCommandHandler(workspaces)
+    query_handler = GetWorkspacesForUserQueryHandler(workspaces)
+    await create.handle(CreateWorkspaceCommand(name="Acme", owner_id="user-1"))
+    await create.handle(CreateWorkspaceCommand(name="Beta", owner_id="user-2"))
+
+    result = await query_handler.handle(GetWorkspacesForUserQuery(user_id="user-1"))
+
+    assert len(result) == 1
+    assert result[0].name == "Acme"

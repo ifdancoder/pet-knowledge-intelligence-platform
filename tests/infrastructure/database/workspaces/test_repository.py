@@ -72,3 +72,19 @@ async def test_delete_removes_the_workspace_and_cascades_members(db_session: Asy
     await repo.delete(workspace)
 
     assert await repo.get_by_id(workspace.id) is None
+
+
+async def test_list_by_user_id_returns_only_the_workspaces_that_user_belongs_to(
+    db_session: AsyncSession,
+) -> None:
+    await _make_user(db_session, "owner-4", "owner4@example.com")
+    await _make_user(db_session, "owner-5", "owner5@example.com")
+    repo = SqlAlchemyWorkspaceRepository(db_session)
+    mine = Workspace.create(name="Mine", owner_id="owner-4")
+    other = Workspace.create(name="Other", owner_id="owner-5")
+    await repo.add(mine)
+    await repo.add(other)
+
+    result = await repo.list_by_user_id("owner-4")
+
+    assert [w.name for w in result] == ["Mine"]

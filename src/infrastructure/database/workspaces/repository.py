@@ -70,3 +70,16 @@ class SqlAlchemyWorkspaceRepository:
         model = result.scalar_one()
         await self._session.delete(model)
         await self._session.flush()
+
+    async def list_by_user_id(self, user_id: str) -> list[Workspace]:
+        member_result = await self._session.execute(
+            select(WorkspaceMemberModel.workspace_id).where(WorkspaceMemberModel.user_id == user_id)
+        )
+        workspace_ids = [row[0] for row in member_result.all()]
+        if not workspace_ids:
+            return []
+
+        result = await self._session.execute(
+            select(WorkspaceModel).where(WorkspaceModel.id.in_(workspace_ids)).order_by(WorkspaceModel.id)
+        )
+        return [Workspace(id=m.id, name=m.name, slug=m.slug) for m in result.scalars().all()]

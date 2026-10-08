@@ -15,10 +15,15 @@ from application.workspaces.commands import (
     InviteMemberCommand,
     RemoveMemberCommand,
 )
-from application.workspaces.queries import GetWorkspaceByIdQuery, GetWorkspaceMembersQuery
+from application.workspaces.queries import (
+    GetWorkspaceByIdQuery,
+    GetWorkspaceMembersQuery,
+    GetWorkspacesForUserQuery,
+)
 from application.workspaces.query_handlers import (
     GetWorkspaceByIdQueryHandler,
     GetWorkspaceMembersQueryHandler,
+    GetWorkspacesForUserQueryHandler,
 )
 from domain.workspaces.entities import Permission, Role
 from infrastructure.database.session import get_db
@@ -42,6 +47,12 @@ def get_create_workspace_handler(session: AsyncSession = Depends(get_db)) -> Cre
 
 def get_workspace_by_id_handler(session: AsyncSession = Depends(get_db)) -> GetWorkspaceByIdQueryHandler:
     return GetWorkspaceByIdQueryHandler(SqlAlchemyWorkspaceRepository(session))
+
+
+def get_workspaces_for_user_handler(
+    session: AsyncSession = Depends(get_db),
+) -> GetWorkspacesForUserQueryHandler:
+    return GetWorkspacesForUserQueryHandler(SqlAlchemyWorkspaceRepository(session))
 
 
 def get_invite_member_handler(session: AsyncSession = Depends(get_db)) -> InviteMemberCommandHandler:
@@ -75,6 +86,15 @@ async def create_workspace(
     workspace = await query_handler.handle(GetWorkspaceByIdQuery(workspace_id))
     assert workspace is not None
     return WorkspaceResponse(id=workspace.id, name=workspace.name, slug=workspace.slug)
+
+
+@router.get("", response_model=list[WorkspaceResponse])
+async def list_my_workspaces(
+    user_id: str = Depends(get_current_user_id),
+    handler: GetWorkspacesForUserQueryHandler = Depends(get_workspaces_for_user_handler),
+) -> list[WorkspaceResponse]:
+    workspaces = await handler.handle(GetWorkspacesForUserQuery(user_id=user_id))
+    return [WorkspaceResponse(id=w.id, name=w.name, slug=w.slug) for w in workspaces]
 
 
 @router.post("/{workspace_id}/members", status_code=status.HTTP_201_CREATED)

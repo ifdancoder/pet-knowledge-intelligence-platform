@@ -96,3 +96,21 @@ async def test_non_member_cannot_view_workspace(
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "not_a_workspace_member"
+
+
+async def test_list_my_workspaces_returns_only_my_workspaces(
+    client: AsyncClient, caplog: logging.LogCaptureFixture
+) -> None:
+    await _register_and_verify(client, "lister@example.com", caplog)
+    await _register_and_verify(client, "other@example.com", caplog)
+    my_token = await _login(client, "lister@example.com")
+    other_token = await _login(client, "other@example.com")
+
+    await client.post("/api/v1/workspaces", json={"name": "Mine"}, headers=_auth_header(my_token))
+    await client.post("/api/v1/workspaces", json={"name": "Theirs"}, headers=_auth_header(other_token))
+
+    response = await client.get("/api/v1/workspaces", headers=_auth_header(my_token))
+
+    assert response.status_code == 200
+    names = [w["name"] for w in response.json()]
+    assert names == ["Mine"]
