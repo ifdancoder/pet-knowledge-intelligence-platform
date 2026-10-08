@@ -4,6 +4,7 @@ import { QueryProvider } from './QueryProvider'
 import { RequireAuth } from './RequireAuth'
 import { LoginPage } from '../auth/LoginPage'
 import { RegisterPage } from '../auth/RegisterPage'
+import { WorkspacePickerPage } from '../workspaces/WorkspacePickerPage'
 import { ToastProvider } from '../shared/ui/Toast'
 
 function SessionExpiryListener() {
@@ -27,6 +28,7 @@ export function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route element={<RequireAuth />}>
               <Route path="/" element={<Navigate to="/workspaces" replace />} />
+              <Route path="/workspaces" element={<WorkspacePickerPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
