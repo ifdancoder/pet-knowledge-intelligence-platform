@@ -13,6 +13,7 @@ from infrastructure.observability.bootstrap import configure_observability
 configure_observability(service_name="kip-api")
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_fastapi_instrumentator.metrics import default as default_metrics
@@ -39,6 +40,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     global _instrumented
     app = FastAPI(title="Knowledge Intelligence Platform", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[os.environ.get("FRONTEND_ORIGIN", "http://localhost:5173")],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     register_domain_exception_handlers(app)
     app.include_router(auth_router)
     app.include_router(workspaces_router)
