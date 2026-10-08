@@ -9,10 +9,30 @@ on:
 jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Build images
+        run: |
+          docker build -t kip:latest .
+          docker build -t kip-frontend:latest ./frontend
+
+      - name: Import images into k3s
+        run: |
+          docker save kip:latest -o /tmp/kip.tar
+          docker save kip-frontend:latest -o /tmp/kip-frontend.tar
+          sudo k3s ctr images import /tmp/kip.tar
+          sudo k3s ctr images import /tmp/kip-frontend.tar
+          rm /tmp/kip.tar /tmp/kip-frontend.tar
+
+      - name: Apply namespace
+        run: kubectl apply -f k8s/production/namespace.yaml
+
+      - name: Create or update the secret
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -20,50 +40,31 @@ jobs:
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: JWT_SECRET,POSTGRES_PASSWORD,RABBITMQ_PASSWORD,S3_SECRET_KEY,ANTHROPIC_API_KEY,SENTRY_DSN,DEPLOY_PATH
-          script: |
-            set -euo pipefail
-            cd "$DEPLOY_PATH"
-            git fetch origin main
-            git reset --hard origin/main
+        run: |
+          kubectl create secret generic kip-secrets -n kip \
+            --from-literal=POSTGRES_USER=kip \
+            --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            --from-literal=RABBITMQ_DEFAULT_USER=kip \
+            --from-literal=RABBITMQ_DEFAULT_PASS="$RABBITMQ_PASSWORD" \
+            --from-literal=S3_ACCESS_KEY=kip \
+            --from-literal=S3_SECRET_KEY="$S3_SECRET_KEY" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=OPENAI_API_KEY="" \
+            --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+            --from-literal=SENTRY_DSN="${SENTRY_DSN:-}" \
+            --from-literal=DATABASE_URL="postgresql+asyncpg://kip:${POSTGRES_PASSWORD}@postgres.kip.svc.cluster.local:5432/kip" \
+            --from-literal=SYNC_DATABASE_URL="postgresql+psycopg2://kip:${POSTGRES_PASSWORD}@postgres.kip.svc.cluster.local:5432/kip" \
+            --from-literal=RABBITMQ_URL="amqp://kip:${RABBITMQ_PASSWORD}@rabbitmq.kip.svc.cluster.local:5672//" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-            docker build -t kip:latest .
-            docker build -t kip-frontend:latest ./frontend
+      - name: Apply manifests
+        run: kubectl apply -f k8s/production/
 
-            docker save kip:latest -o /tmp/kip.tar
-            docker save kip-frontend:latest -o /tmp/kip-frontend.tar
-            sudo k3s ctr images import /tmp/kip.tar
-            sudo k3s ctr images import /tmp/kip-frontend.tar
-            rm /tmp/kip.tar /tmp/kip-frontend.tar
-
-            kubectl apply -f k8s/production/namespace.yaml
-
-            kubectl create secret generic kip-secrets -n kip \
-              --from-literal=POSTGRES_USER=kip \
-              --from-literal=POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
-              --from-literal=RABBITMQ_DEFAULT_USER=kip \
-              --from-literal=RABBITMQ_DEFAULT_PASS="$RABBITMQ_PASSWORD" \
-              --from-literal=S3_ACCESS_KEY=kip \
-              --from-literal=S3_SECRET_KEY="$S3_SECRET_KEY" \
-              --from-literal=JWT_SECRET="$JWT_SECRET" \
-              --from-literal=OPENAI_API_KEY="" \
-              --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
-              --from-literal=SENTRY_DSN="${SENTRY_DSN:-}" \
-              --from-literal=DATABASE_URL="postgresql+asyncpg://kip:${POSTGRES_PASSWORD}@postgres.kip.svc.cluster.local:5432/kip" \
-              --from-literal=SYNC_DATABASE_URL="postgresql+psycopg2://kip:${POSTGRES_PASSWORD}@postgres.kip.svc.cluster.local:5432/kip" \
-              --from-literal=RABBITMQ_URL="amqp://kip:${RABBITMQ_PASSWORD}@rabbitmq.kip.svc.cluster.local:5672//" \
-              --dry-run=client -o yaml | kubectl apply -f -
-
-            kubectl apply -f k8s/production/
-
-            kubectl rollout restart deployment/api -n kip
-            kubectl rollout restart deployment/worker -n kip
-            kubectl rollout restart deployment/frontend -n kip
-            kubectl rollout status deployment/api -n kip --timeout=120s
-            kubectl rollout status deployment/worker -n kip --timeout=120s
-            kubectl rollout status deployment/frontend -n kip --timeout=60s
+      - name: Restart app deployments
+        run: |
+          kubectl rollout restart deployment/api -n kip
+          kubectl rollout restart deployment/worker -n kip
+          kubectl rollout restart deployment/frontend -n kip
+          kubectl rollout status deployment/api -n kip --timeout=120s
+          kubectl rollout status deployment/worker -n kip --timeout=120s
+          kubectl rollout status deployment/frontend -n kip --timeout=60s
