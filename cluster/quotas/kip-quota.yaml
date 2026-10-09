@@ -1,0 +1,27 @@
+# Cluster-wide policy, not specific to kip. See README.md in this directory
+# for why this lives here and the arithmetic behind these numbers. Applied
+# by hand with the admin kubeconfig; not part of this project's CI.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: kip-quota
+  namespace: kip
+spec:
+  hard:
+    requests.cpu: 300m
+    requests.memory: 1800Mi
+    limits.cpu: "6"
+    limits.memory: 4200Mi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: kip-limits
+  namespace: kip
+spec:
+  limits:
+    - type: Container
+      defaultRequest: {cpu: 10m, memory: 32Mi}
+      default: {cpu: 50m, memory: 128Mi}
+      min: {cpu: 5m, memory: 16Mi}
+      max: {cpu: 1000m, memory: 1024Mi}

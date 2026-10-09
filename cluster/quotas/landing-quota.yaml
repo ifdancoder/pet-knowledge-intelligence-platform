@@ -1,0 +1,27 @@
+# Cluster-wide policy, not specific to kip. See README.md in this directory
+# for why this lives here and the arithmetic behind these numbers. Applied
+# by hand with the admin kubeconfig; not part of this project's CI.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: landing-quota
+  namespace: landing
+spec:
+  hard:
+    requests.cpu: 250m
+    requests.memory: 500Mi
+    limits.cpu: 900m
+    limits.memory: 850Mi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: landing-limits
+  namespace: landing
+spec:
+  limits:
+    - type: Container
+      defaultRequest: {cpu: 10m, memory: 32Mi}
+      default: {cpu: 50m, memory: 128Mi}
+      min: {cpu: 5m, memory: 16Mi}
+      max: {cpu: 500m, memory: 512Mi}
