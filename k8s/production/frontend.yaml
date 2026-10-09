@@ -1,3 +1,8 @@
+# "__TAG__" in the image reference below is substituted by the deploy workflow
+# (.github/workflows/deploy.yml) with the git commit SHA, so the pod spec
+# actually changes on every deploy and triggers a real rollout. There is no
+# registry: the image must already be imported into the node's containerd
+# before this is applied, hence imagePullPolicy: Never.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,8 +20,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: kip-frontend:latest
-          imagePullPolicy: IfNotPresent
+          image: kip-frontend:__TAG__
+          imagePullPolicy: Never
           ports:
             - containerPort: 80
           resources:
