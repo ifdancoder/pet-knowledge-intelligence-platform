@@ -7,11 +7,13 @@ These manifests deploy to the shared k3s server that already runs ifdancoder.ru,
 Everything `.github/workflows/deploy.yml` cannot do by itself, done once before the first push-triggered deploy.
 
 1. Install a GitHub Actions self-hosted runner directly on the server, registered to this repo (Settings -> Actions -> Runners -> New self-hosted runner gives the exact `config.sh` command and token), under its own dedicated user (e.g. `deploy-kip`). Install it as a service (`sudo ./svc.sh install deploy-kip && sudo ./svc.sh start`) so it survives reboots.
-2. Clone this repository once, as a sibling directory next to the runner's own directory, owned by that same user: `/home/deploy-kip/pet-knowledge-intelligence-platform`. The deploy workflow only ever `git fetch`/`git reset --hard`s this fixed clone; it does not check out a fresh copy per run.
+2. Clone this repository once, as a sibling directory next to the runner's own directory, owned by that same user, for example `/home/deploy-kip/pet-knowledge-intelligence-platform`. The deploy workflow only ever `git fetch`/`git reset --hard`s this fixed clone; it does not check out a fresh copy per run. The exact path is not hardcoded in the workflow file (committed, possibly public); it is read from the `DEPLOY_PATH` variable in step 6.
 3. Make sure that user can run `docker`, `kubectl`, and `k3s ctr images import` non-interactively: either it is root, has passwordless `sudo`, is in the `docker` group, or has a working `~/.kube/config` (or readable `/etc/rancher/k3s/k3s.yaml`).
 4. Check the cert-manager issuer name already configured on the cluster: `kubectl get clusterissuers`. If it is not `letsencrypt-prod`, edit the `cert-manager.io/cluster-issuer` annotation in `ingress.yaml` to match before the first apply.
 5. Add a DNS `A` record for `knowledge.ifdancoder.ru` pointing at the server's public IP (the same IP `ifdancoder.ru` already resolves to).
-6. In the GitHub repo, add under Settings -> Secrets and variables -> Actions -> Secrets: `JWT_SECRET` (e.g. `openssl rand -hex 32`), `POSTGRES_PASSWORD`, `RABBITMQ_PASSWORD`, `S3_SECRET_KEY`, and optionally `ANTHROPIC_API_KEY`, `SENTRY_DSN`.
+6. In the GitHub repo, under Settings -> Secrets and variables -> Actions, add:
+   - Secrets: `JWT_SECRET` (e.g. `openssl rand -hex 32`), `POSTGRES_PASSWORD`, `RABBITMQ_PASSWORD`, `S3_SECRET_KEY`, and optionally `ANTHROPIC_API_KEY`, `SENTRY_DSN`.
+   - Variables: `DEPLOY_PATH`, set to the exact clone path from step 2 (e.g. `/home/deploy-kip/pet-knowledge-intelligence-platform`). A path and username are not secret-sensitive the way a password is, but there is no reason to commit them into the workflow file either; a Variable keeps the value out of the (possibly public) source while still not pretending it needs encryption.
 7. Push to `main`. Once `CI` passes, `Deploy` runs automatically on the runner. Watch it with `kubectl get pods -n kip -w` on the server, or `gh run watch` locally.
 8. Pull the Ollama model once (it persists in its `PersistentVolumeClaim`, no need to repeat on later deploys):
    ```bash
