@@ -81,3 +81,16 @@ jobs:
         if: always()
         run: |
           docker rmi kip:${{ github.event.workflow_run.head_sha }} kip-frontend:${{ github.event.workflow_run.head_sha }} || true
+
+      - name: Prune old images
+        if: always()
+        run: |
+          # Every deploy imports a new per-SHA image into k3s's own containerd
+          # store but never removes the previous one. Left unchecked, that
+          # store (and Docker's own build cache) grows until the node trips
+          # kubelet's disk-pressure eviction threshold mid-deploy. --prune
+          # only removes images no longer referenced by any pod, so this is
+          # safe even while the previous deployment's pods are still rolling.
+          sudo k3s crictl rmi --prune || true
+          docker image prune -af || true
+          docker builder prune -af || true
