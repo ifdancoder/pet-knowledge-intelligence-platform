@@ -40,7 +40,7 @@ spec:
             - name: data
               mountPath: /root/.ollama
           resources:
-            requests: {cpu: 50m, memory: 256Mi}
+            requests: {cpu: 30m, memory: 256Mi}
             limits: {cpu: 1000m, memory: 768Mi}
   volumeClaimTemplates:
     - metadata:

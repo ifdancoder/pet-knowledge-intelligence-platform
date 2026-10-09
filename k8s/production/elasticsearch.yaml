@@ -25,13 +25,15 @@ spec:
             - name: xpack.security.enabled
               value: "false"
             - name: ES_JAVA_OPTS
-              value: "-Xms512m -Xmx512m"
+              # Smaller heap than local dev: the shared VPS node has ~4GB total,
+              # split across every project it hosts, not just this one.
+              value: "-Xms256m -Xmx256m"
           volumeMounts:
             - name: data
               mountPath: /usr/share/elasticsearch/data
           resources:
-            requests: {cpu: 100m, memory: 768Mi}
-            limits: {cpu: 1000m, memory: 1536Mi}
+            requests: {cpu: 50m, memory: 384Mi}
+            limits: {cpu: 1000m, memory: 640Mi}
   volumeClaimTemplates:
     - metadata:
         name: data

@@ -28,7 +28,7 @@ spec:
                 secretKeyRef: {name: kip-secrets, key: RABBITMQ_DEFAULT_PASS}
           resources:
             requests: {cpu: 20m, memory: 150Mi}
-            limits: {cpu: 500m, memory: 512Mi}
+            limits: {cpu: 500m, memory: 300Mi}
 ---
 apiVersion: v1
 kind: Service
