@@ -37,7 +37,9 @@ def pg_container() -> Iterator[PostgresContainer]:
 
 @pytest.fixture(scope="module")
 def minio_container() -> Iterator[MinioContainer]:
-    with MinioContainer(image="minio/minio:latest") as container:
+    # minio/minio was deleted from Docker Hub on 2026-09-11; Chainguard mirrors
+    # the same upstream binary with anonymous pulls still open.
+    with MinioContainer(image="cgr.dev/chainguard/minio:latest") as container:
         yield container
 
 

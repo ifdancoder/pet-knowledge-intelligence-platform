@@ -16,7 +16,9 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio
+          # minio/minio was deleted from Docker Hub on 2026-09-11; Chainguard
+          # mirrors the same upstream binary with anonymous pulls still open.
+          image: cgr.dev/chainguard/minio:latest
           # Keep the image entrypoint and override only its arguments.
           args: ["server", "/data", "--console-address", ":9091"]
           ports:
