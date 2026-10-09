@@ -30,7 +30,7 @@ spec:
             - name: data
               mountPath: /usr/share/elasticsearch/data
           resources:
-            requests: {cpu: 150m, memory: 768Mi}
+            requests: {cpu: 100m, memory: 768Mi}
             limits: {cpu: 1000m, memory: 1536Mi}
   volumeClaimTemplates:
     - metadata:

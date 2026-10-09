@@ -115,7 +115,7 @@ spec:
             - name: dashboards
               mountPath: /etc/grafana/provisioning/dashboards
           resources:
-            requests: {cpu: 25m, memory: 96Mi}
+            requests: {cpu: 10m, memory: 96Mi}
             limits: {cpu: 500m, memory: 512Mi}
       volumes:
         - name: datasources
