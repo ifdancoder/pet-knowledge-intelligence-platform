@@ -18,6 +18,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    env:
+      # No Tempo in CI, and nothing here asserts on exported trace content,
+      # so the SDK would otherwise just log noisy, harmless connection-refused
+      # errors on every export attempt.
+      OTEL_SDK_DISABLED: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
