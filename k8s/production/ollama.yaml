@@ -19,6 +19,23 @@ spec:
           image: ollama/ollama:latest
           ports:
             - containerPort: 11434
+          # Pulls the configured model on every pod start. Idempotent: once the
+          # model is already in the PVC, `ollama pull` is a quick no-op cache
+          # check, not a redownload. `|| true` keeps a transient pull failure
+          # (e.g. no network yet) from failing the postStart hook itself, which
+          # would otherwise kill and restart an already-healthy container.
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    for i in $(seq 1 30); do
+                      ollama list >/dev/null 2>&1 && break
+                      sleep 1
+                    done
+                    ollama pull smollm2:135m || true
           volumeMounts:
             - name: data
               mountPath: /root/.ollama

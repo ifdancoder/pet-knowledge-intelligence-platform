@@ -12,10 +12,8 @@ Everything `.github/workflows/deploy.yml` cannot do by itself, done once before 
 4. Add a DNS `A` record for `knowledge.ifdancoder.ru` pointing at the server's public IP (the same IP `ifdancoder.ru` already resolves to).
 5. In the GitHub repo, under Settings -> Secrets and variables -> Actions -> Secrets, add: `JWT_SECRET` (e.g. `openssl rand -hex 32`), `POSTGRES_PASSWORD`, `RABBITMQ_PASSWORD`, `S3_SECRET_KEY`, and optionally `ANTHROPIC_API_KEY`, `SENTRY_DSN`.
 6. Push to `main`. Once `CI` passes, `Deploy` runs automatically on the runner. Watch it with `kubectl get pods -n kip -w` on the server, or `gh run watch` locally.
-7. Pull the Ollama model once (it persists in its `PersistentVolumeClaim`, no need to repeat on later deploys):
-   ```bash
-   kubectl exec -n kip ollama-0 -- ollama pull smollm2:135m
-   ```
+
+No separate step to pull the Ollama model: `ollama.yaml`'s `postStart` hook pulls `smollm2:135m` itself on every pod start (fast no-op once it is already cached in the PVC). Give the `ollama-0` pod a minute after it first reaches `Running` before testing chat, since the first pull still has to happen.
 
 ## Verification
 
